@@ -10,5 +10,5 @@ Default plugins exist in /plugins. Plugins can also be hosted as separate projec
 go build -o bin/ -buildmode=plugin ./plugins/...
 
 # build core
-go build -o sg-core cmd/main.go
+go build -o sg-core cmd/*.go
 ```

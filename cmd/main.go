@@ -16,20 +16,33 @@ func main() {
 		}
 	}()
 
-	configFile := flag.String("config", "/etc/sg-core.conf.yaml", "configuration file path")
+	configPath := flag.String("config", "/etc/sg-core.conf.yaml", "configuration file path")
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [OPTIONS]\n\nAvailable options:\n", os.Args[0])
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
-	fmt.Println(*configFile)
+	file, err := os.Open(*configPath)
+	if err != nil {
+		fmt.Printf("failed opening file: %s\n", err.Error())
+		return
+	}
+
+	err = parseConfig(file)
+	if err != nil {
+		fmt.Printf("failed parsing config file: %s\n", err.Error())
+		return
+	}
+
+	fmt.Println(config.Plugins.Transports[0].Name)
+
+	//register plugins
 
 	p, err := plugin.Open("/home/pleimer/go/src/github.com/infrawatch/sg-core-refactor/bin/socket.so")
 	if err != nil {
 		panic(err)
 	}
-
 	s, err := p.Lookup("New")
 	if err != nil {
 		panic(err)
@@ -40,5 +53,4 @@ func main() {
 	s2 := newSocket()
 	s1.Run()
 	s2.Run()
-
 }
