@@ -1,7 +1,9 @@
 package main
 
 import (
+	"flag"
 	"fmt"
+	"os"
 	"plugin"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
@@ -13,6 +15,15 @@ func main() {
 			fmt.Println(err)
 		}
 	}()
+
+	configFile := flag.String("config", "/etc/sg-core.conf.yaml", "configuration file path")
+	flag.Usage = func() {
+		fmt.Printf("Usage: %s [OPTIONS]\n\nAvailable options:\n", os.Args[0])
+		flag.PrintDefaults()
+	}
+	flag.Parse()
+
+	fmt.Println(*configFile)
 
 	p, err := plugin.Open("/home/pleimer/go/src/github.com/infrawatch/sg-core-refactor/bin/socket.so")
 	if err != nil {
