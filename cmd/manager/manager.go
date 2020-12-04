@@ -7,7 +7,7 @@ import (
 	"plugin"
 	"strings"
 
-	"github.com/infrawatch/sg-core-refactor/pkg/transport"
+	"github.com/infrawatch/sg-core-refactor/pkg/extension"
 )
 
 var (
@@ -59,14 +59,14 @@ func SetPluginConfig(name string, config interface{}) error {
 
 	n, err := p.Lookup("New")
 	if err != nil {
-		return fmt.Errorf("could not load plugin 'New' function %s: %s", name, err)
+		return fmt.Errorf("could not load 'New' constructor for plugin %s: %s", name, err)
 	}
 
-	o := n.(func() transport.Transport)()
-	plugins = append(plugins, o)
-	err = o.Config(config)
+	e := n.(func() extension.Extension)()
+	err = e.Config(config)
 	if err != nil {
 		return err
 	}
+	plugins = append(plugins, e)
 	return nil
 }

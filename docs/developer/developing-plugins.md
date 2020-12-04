@@ -4,9 +4,12 @@
 2. Handler
 3. Application
 
+# Philosophy
+Plugins should be objects with a constructor such that more than one can be 
+created if there exists more than one configuration for that plugin.
 
 # Plugin configurations
-Plugins should not read from their own cofiguration files. The sg-core provides
+Plugins should not read their own cofiguration files. The sg-core provides
 all methods for reading configurations using the golang 
 [yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3). However, validation must be 
 implemented by the plugin.
