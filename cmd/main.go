@@ -4,11 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"path/filepath"
-	"plugin"
-	"strings"
 
-	"github.com/infrawatch/sg-core-refactor/pkg/transport"
+	"github.com/infrawatch/sg-core-refactor/cmd/manager"
 )
 
 func main() {
@@ -22,7 +19,7 @@ func main() {
 
 	file, err := os.Open(*configPath)
 	if err != nil {
-		fmt.Printf("failed opening file: %s\n", err.Error())
+		fmt.Printf("failed opening config file: %s\n", err.Error())
 		return
 	}
 
@@ -32,51 +29,16 @@ func main() {
 		return
 	}
 
-	// load config binaries
-	sharedObjs := map[string]string{}
-	err = filepath.Walk(*pluginDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-
-		if info.IsDir() {
-			return nil
-		}
-
-		if filepath.Ext(path) != ".so" {
-			return nil
-		}
-
-		baseName := strings.Split(info.Name(), ".")
-		sharedObjs[baseName[len(baseName)-2]] = path
-		return nil
-	})
-
+	err = manager.LoadBinaries(*pluginDir)
 	if err != nil {
 		fmt.Printf("failed loading plugin binaries: %s\n", err.Error())
 	}
 
-	plugins := []interface{}{}
 	for _, pluginConfig := range config.Plugins {
-		if _, ok := sharedObjs[pluginConfig.Name]; !ok {
-			fmt.Printf("[WARNING] Could not load plugin '%s': binary does not exist in %s\n", pluginConfig.Name, *pluginDir)
-			continue
-		}
-
-		p, err := plugin.Open(sharedObjs[pluginConfig.Name])
+		err = manager.SetPluginConfig(pluginConfig.Name, pluginConfig.Config)
 		if err != nil {
-			fmt.Printf("[WARNING] Could not load plugin %s: %s\n", pluginConfig.Name, err)
+			fmt.Printf("failed configuring %s plugin: %s\n", pluginConfig.Name, err)
 			continue
 		}
-
-		n, err := p.Lookup("New")
-		if err != nil {
-			fmt.Printf("[WARNING] Could not load plugin 'New' function %s: %s\n", pluginConfig.Name, err)
-			continue
-		}
-
-		o := n.(func() transport.Transport)()
-		plugins = append(plugins, o)
-		o.Config(pluginConfig.Config)
 	}
 }
