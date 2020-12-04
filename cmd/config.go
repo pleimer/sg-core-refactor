@@ -13,11 +13,10 @@ import (
 )
 
 var config struct {
-	Plugins struct {
-		Transports []struct {
-			Name string `yaml:"name" validate:"required"`
-		} `yaml:"transports"`
-	} `yaml:"plugins"`
+	Plugins []struct {
+		Name   string `validate:"required"`
+		Config interface{}
+	} `validate:"dive"`
 }
 
 func parseConfig(r io.Reader) error {
@@ -33,7 +32,7 @@ func parseConfig(r io.Reader) error {
 		return errors.Wrap(err, "unmarshalling config yaml")
 	}
 
-	err = validate.Struct(config)
+	err = validate.Struct(&config)
 	if err != nil {
 		if e, ok := err.(validator.ValidationErrors); ok {
 			missingFields := []string{}
