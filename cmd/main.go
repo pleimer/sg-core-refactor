@@ -4,19 +4,16 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"path/filepath"
 	"plugin"
+	"strings"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
 )
 
 func main() {
-	defer func() {
-		if err := recover(); err != nil {
-			fmt.Println(err)
-		}
-	}()
-
 	configPath := flag.String("config", "/etc/sg-core.conf.yaml", "configuration file path")
+	pluginDir := flag.String("pluginDir", "/usr/lib64/sg-core/", "path to plugin binaries")
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [OPTIONS]\n\nAvailable options:\n", os.Args[0])
 		flag.PrintDefaults()
@@ -35,22 +32,51 @@ func main() {
 		return
 	}
 
-	fmt.Println(config.Plugins.Transports[0].Name)
+	// load config binaries
+	sharedObjs := map[string]string{}
+	err = filepath.Walk(*pluginDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
 
-	//register plugins
+		if info.IsDir() {
+			return nil
+		}
 
-	p, err := plugin.Open("/home/pleimer/go/src/github.com/infrawatch/sg-core-refactor/bin/socket.so")
+		if filepath.Ext(path) != ".so" {
+			return nil
+		}
+
+		baseName := strings.Split(info.Name(), ".")
+		sharedObjs[baseName[len(baseName)-2]] = path
+		return nil
+	})
+
 	if err != nil {
-		panic(err)
-	}
-	s, err := p.Lookup("New")
-	if err != nil {
-		panic(err)
+		fmt.Printf("failed loading plugin binaries: %s\n", err.Error())
 	}
 
-	newSocket := s.(func() transport.Transport)
-	s1 := newSocket()
-	s2 := newSocket()
-	s1.Run()
-	s2.Run()
+	plugins := []interface{}{}
+	for _, pluginConfig := range config.Plugins {
+		if _, ok := sharedObjs[pluginConfig.Name]; !ok {
+			fmt.Printf("[WARNING] Could not load plugin '%s': binary does not exist in %s\n", pluginConfig.Name, *pluginDir)
+			continue
+		}
+
+		p, err := plugin.Open(sharedObjs[pluginConfig.Name])
+		if err != nil {
+			fmt.Printf("[WARNING] Could not load plugin %s: %s\n", pluginConfig.Name, err)
+			continue
+		}
+
+		n, err := p.Lookup("New")
+		if err != nil {
+			fmt.Printf("[WARNING] Could not load plugin 'New' function %s: %s\n", pluginConfig.Name, err)
+			continue
+		}
+
+		o := n.(func() transport.Transport)()
+		plugins = append(plugins, o)
+		o.Config(pluginConfig.Config)
+	}
 }
