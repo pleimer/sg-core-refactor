@@ -8,6 +8,8 @@
 Plugins should be objects with a constructor such that more than one can be 
 created if there exists more than one configuration for that plugin.
 
+# Interface Heiarrchy 
+
 # Plugin configurations
 Plugins should not read their own cofiguration files. The sg-core provides
 all methods for reading configurations using the golang 
