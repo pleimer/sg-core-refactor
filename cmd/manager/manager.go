@@ -11,13 +11,11 @@ import (
 )
 
 var (
-	binPaths map[string]string
-	plugins  []interface{}
+	extensions map[string]extension.Extension
 )
 
 func init() {
-	binPaths = map[string]string{}
-	plugins = []interface{}{}
+	extensions = map[string]extension.Extension{}
 }
 
 // LoadBinaries load binary shared objects from directory
@@ -35,8 +33,20 @@ func LoadBinaries(dir string) error {
 			return nil
 		}
 
+		p, err := plugin.Open(path)
+		if err != nil {
+			return fmt.Errorf("could not open plugin %s: %s", path, err)
+		}
+
 		baseName := strings.Split(info.Name(), ".")
-		binPaths[baseName[len(baseName)-2]] = path
+
+		n, err := p.Lookup("New")
+		if err != nil {
+			return fmt.Errorf("could not load 'New' constructor for plugin %s: %s", baseName, err)
+		}
+
+		e := n.(func() extension.Extension)()
+		extensions[baseName[len(baseName)-2]] = e
 		return nil
 	})
 	if err != nil {
@@ -48,25 +58,13 @@ func LoadBinaries(dir string) error {
 
 // SetPluginConfig pass config object to plugin
 func SetPluginConfig(name string, config interface{}) error {
-	if _, ok := binPaths[name]; !ok {
+	if _, ok := extensions[name]; !ok {
 		return fmt.Errorf("could not load plugin '%s': binary does not exist", name)
 	}
 
-	p, err := plugin.Open(binPaths[name])
-	if err != nil {
-		return fmt.Errorf("could not load plugin %s: %s", name, err)
-	}
-
-	n, err := p.Lookup("New")
-	if err != nil {
-		return fmt.Errorf("could not load 'New' constructor for plugin %s: %s", name, err)
-	}
-
-	e := n.(func() extension.Extension)()
-	err = e.Config(config)
+	err := extensions[name].Config(config)
 	if err != nil {
 		return err
 	}
-	plugins = append(plugins, e)
 	return nil
 }
