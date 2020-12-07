@@ -2,69 +2,92 @@ package manager
 
 import (
 	"fmt"
-	"os"
 	"path/filepath"
 	"plugin"
 	"strings"
 
-	"github.com/infrawatch/sg-core-refactor/pkg/extension"
+	"github.com/infrawatch/sg-core-refactor/pkg/application"
+	"github.com/infrawatch/sg-core-refactor/pkg/handler"
+	"github.com/infrawatch/sg-core-refactor/pkg/transport"
+	"github.com/pkg/errors"
 )
 
 var (
-	extensions map[string]extension.Extension
+	transports   map[string]*transportPipe
+	handlers     map[string]handler.Handler
+	applications map[string]application.Application
+	pluginPath   string
 )
 
+// handlers are associated with tranport plugins
+type transportPipe struct {
+	instance transport.Transport
+	handlers []handler.Handler
+}
+
 func init() {
-	extensions = map[string]extension.Extension{}
+	transports = map[string]*transportPipe{}
+	handlers = map[string]handler.Handler{}
+	applications = map[string]application.Application{}
+	pluginPath = "/usr/lib64/sg-core"
 }
 
-// LoadBinaries load binary shared objects from directory
-func LoadBinaries(dir string) error {
-	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+//SetPluginDir set directory path containing plugin binaries
+func SetPluginDir(path string) {
+	pluginPath = path
+}
+
+//SetTransport set up transport plugin with configuration.
+func SetTransport(name string, mode string, handlers []string, config interface{}) error {
+	n, path, err := initPlugin(name)
+	if err != nil {
+		return errors.Wrapf(err, "failed to open transport constructor 'New' in binary %s", path)
+	}
+
+	new, ok := n.(func() transport.Transport)
+	if !ok {
+		return fmt.Errorf("plugin %s constructor 'New' is not of type 'transport.NewFn'", name)
+	}
+
+	transports[name] = &transportPipe{
+		instance: new(),
+		handlers: []handler.Handler{},
+	}
+
+	for _, hName := range handlers {
+		n, path, err := initPlugin(hName)
 		if err != nil {
-			return err
+			return errors.Wrapf(err, "failed to open handler constructor 'New' in binary %s", path)
+		}
+		new, ok := n.(func() handler.Handler)
+		if !ok {
+			return fmt.Errorf("plugin %s constructor 'New' is not of type 'handler.NewFn'", name)
 		}
 
-		if info.IsDir() {
-			return nil
-		}
+		transports[name].handlers = append(transports[name].handlers, new())
+	}
 
-		if filepath.Ext(path) != ".so" {
-			return nil
-		}
-
-		p, err := plugin.Open(path)
-		if err != nil {
-			return fmt.Errorf("could not open plugin %s: %s", path, err)
-		}
-
-		baseName := strings.Split(info.Name(), ".")
-
-		n, err := p.Lookup("New")
-		if err != nil {
-			return fmt.Errorf("could not load 'New' constructor for plugin %s: %s", baseName, err)
-		}
-
-		e := n.(func() extension.Extension)()
-		extensions[baseName[len(baseName)-2]] = e
+	if config == nil {
 		return nil
-	})
+	}
+
+	err = transports[name].instance.Config(config)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
-// SetPluginConfig pass config object to plugin
-func SetPluginConfig(name string, config interface{}) error {
-	if _, ok := extensions[name]; !ok {
-		return fmt.Errorf("could not load plugin '%s': binary does not exist", name)
+// helper functions
+
+func initPlugin(name string) (plugin.Symbol, string, error) {
+	bin := strings.Join([]string{name, "so"}, ".")
+	path := filepath.Join(pluginPath, bin)
+	p, err := plugin.Open(path)
+	if err != nil {
+		return nil, "", errors.Wrapf(err, "failed to open plugin binary %s", path)
 	}
 
-	err := extensions[name].Config(config)
-	if err != nil {
-		return err
-	}
-	return nil
+	n, err := p.Lookup("New")
+	return n, path, err
 }

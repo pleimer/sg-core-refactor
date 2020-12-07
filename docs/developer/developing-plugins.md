@@ -21,3 +21,9 @@ Sg-core looks within it's own configuration for plugin configurations, matching
 passed to the plugin's `Config()` function. Each plugin is
 responsible for validating the passed in configuration and should return an
 error in the case that it fails.
+
+# Handlers
+
+Handlers convert incoming message to internal bus format. They then either write
+to the events or metrics bus. Handlers take no configuration and only serve one
+purpose.

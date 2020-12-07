@@ -13,10 +13,14 @@ import (
 )
 
 var config struct {
-	Plugins []struct {
-		Name   string `validate:"required"`
-		Config interface{}
+	Transports []struct {
+		Name     string `validate:"required"`
+		Mode     string `validate:"required"`
+		Handlers []string
+		Config   interface{}
 	} `validate:"dive"`
+	Applications []struct {
+	}
 }
 
 func parseConfig(r io.Reader) error {

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"os"
 
 	"github.com/infrawatch/sg-core-refactor/cmd/manager"
+	"github.com/infrawatch/sg-core-refactor/pkg/data"
 )
 
 func main() {
@@ -19,26 +21,39 @@ func main() {
 
 	file, err := os.Open(*configPath)
 	if err != nil {
-		fmt.Printf("failed opening config file: %s\n", err.Error())
+		fmt.Printf("failed opening config file: %s\n", err)
 		return
 	}
 
 	err = parseConfig(file)
 	if err != nil {
-		fmt.Printf("failed parsing config file: %s\n", err.Error())
+		fmt.Printf("failed parsing config file: %s\n", err)
 		return
 	}
 
-	err = manager.LoadBinaries(*pluginDir)
-	if err != nil {
-		fmt.Printf("failed loading plugin binaries: %s\n", err.Error())
-	}
+	manager.SetPluginDir(*pluginDir)
 
-	for _, pluginConfig := range config.Plugins {
-		err = manager.SetPluginConfig(pluginConfig.Name, pluginConfig.Config)
+	for _, tConfig := range config.Transports {
+		err = manager.SetTransport(tConfig.Name, tConfig.Mode, tConfig.Handlers, tConfig.Config)
 		if err != nil {
-			fmt.Printf("failed configuring %s plugin: %s\n", pluginConfig.Name, err)
+			fmt.Printf("failed configuring %s plugin: %s\n", tConfig.Name, err)
 			continue
+		}
+	}
+}
+
+func run(ctx context.Context) {
+	metricChannel := make(chan data.Metric)
+	eventChannel := make(chan data.Metric)
+
+	for {
+		select {
+		case <-eventChannel:
+			fmt.Printf("Recieved event")
+		case <-metricChannel:
+			fmt.Printf("Recieved metric")
+		case <-ctx.Done():
+			fmt.Printf("Exiting")
 		}
 	}
 }

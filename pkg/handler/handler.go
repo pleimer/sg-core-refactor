@@ -1,3 +1,14 @@
 package handler
 
-// package handler describes the interface for interacting with handler plugins
+import "github.com/infrawatch/sg-core-refactor/pkg/data"
+
+// package handler contains the interface description for handler plugins
+
+// Handler
+type Handler interface {
+	Handle([]byte) ([]byte, error)
+	Type() data.Type
+}
+
+// NewFn New func must be of this type
+type NewFn func() Handler

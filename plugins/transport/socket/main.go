@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 
-	"github.com/infrawatch/sg-core-refactor/pkg/extension"
+	"github.com/infrawatch/sg-core-refactor/pkg/transport"
 )
 
 // Config holds socket plugin configuration
@@ -25,6 +25,7 @@ func (s *Socket) Config(c interface{}) error {
 	return nil
 }
 
-func New() extension.Extension {
+//New create new socket transport
+func New() transport.Transport {
 	return &Socket{}
 }
