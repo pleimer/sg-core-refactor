@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"sync"
 
 	"github.com/infrawatch/sg-core-refactor/cmd/manager"
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
@@ -34,12 +35,23 @@ func main() {
 	manager.SetPluginDir(*pluginDir)
 
 	for _, tConfig := range config.Transports {
-		err = manager.SetTransport(tConfig.Name, tConfig.Mode, tConfig.Handlers, tConfig.Config)
+		err = manager.InitTransport(tConfig.Name, tConfig.Mode, tConfig.Config)
 		if err != nil {
-			fmt.Printf("failed configuring %s plugin: %s\n", tConfig.Name, err)
+			fmt.Printf("failed configuring transport '%s': %s\n", tConfig.Name, err)
 			continue
 		}
+		err = manager.SetTransportHandlers(tConfig.Name, tConfig.Handlers)
+		if err != nil {
+			fmt.Printf("failed loading handlers for transport '%s': %s\n", tConfig.Name, err)
+			continue
+		}
+		fmt.Printf("loaded transport '%s'\n", tConfig.Name)
 	}
+
+	wg := new(sync.WaitGroup)
+	manager.RunTransports(wg)
+
+	wg.Wait()
 }
 
 func run(ctx context.Context) {

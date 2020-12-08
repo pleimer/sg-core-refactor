@@ -10,7 +10,7 @@ import (
 type collectdMetricsHandler struct{}
 
 func (c *collectdMetricsHandler) Handle(msg []byte) ([]byte, error) {
-	fmt.Println("Handling!!!")
+	fmt.Println(string(msg))
 	return nil, nil
 }
 

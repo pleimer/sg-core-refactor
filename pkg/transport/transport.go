@@ -2,6 +2,7 @@ package transport
 
 import (
 	"strings"
+	"sync"
 )
 
 // package transport defines the interfaces for interacting with transport
@@ -33,6 +34,7 @@ func (m Mode) FromString(s string) {
 //Transport type listens on one interface and delivers data to core
 type Transport interface {
 	Config(interface{}) error
+	Run(*sync.WaitGroup, chan []byte)
 }
 
 //NewFn transport New function must be of this type

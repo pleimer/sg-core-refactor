@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"plugin"
 	"strings"
+	"sync"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/application"
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
@@ -12,22 +13,18 @@ import (
 	"github.com/pkg/errors"
 )
 
+// TODO: give transport and associated handlers the same channel to talk to eachother with
+
 var (
-	transports   map[string]*transportPipe
-	handlers     map[string]handler.Handler
+	transports   map[string]transport.Transport
+	handlers     map[string][]handler.Handler
 	applications map[string]application.Application
 	pluginPath   string
 )
 
-// handlers are associated with tranport plugins
-type transportPipe struct {
-	instance transport.Transport
-	handlers []handler.Handler
-}
-
 func init() {
-	transports = map[string]*transportPipe{}
-	handlers = map[string]handler.Handler{}
+	transports = map[string]transport.Transport{}
+	handlers = map[string][]handler.Handler{}
 	applications = map[string]application.Application{}
 	pluginPath = "/usr/lib64/sg-core"
 }
@@ -37,8 +34,14 @@ func SetPluginDir(path string) {
 	pluginPath = path
 }
 
-//SetTransport set up transport plugin with configuration.
-func SetTransport(name string, mode string, handlers []string, config interface{}) error {
+//SetReceiver set up transport plugin with configuration.
+func SetReceiver(transportName string, mode string, handlers []string, config interface{}) error {
+
+	return nil
+}
+
+//InitTransport load tranpsort binary and initialize with config
+func InitTransport(name string, mode string, config interface{}) error {
 	n, path, err := initPlugin(name)
 	if err != nil {
 		return errors.Wrapf(err, "failed to open transport constructor 'New' in binary %s", path)
@@ -49,12 +52,22 @@ func SetTransport(name string, mode string, handlers []string, config interface{
 		return fmt.Errorf("plugin %s constructor 'New' is not of type 'transport.NewFn'", name)
 	}
 
-	transports[name] = &transportPipe{
-		instance: new(),
-		handlers: []handler.Handler{},
+	transports[name] = new()
+
+	if config == nil {
+		return nil
 	}
 
-	for _, hName := range handlers {
+	err = transports[name].Config(config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+//SetTransportHandlers load handlers binaries for transport
+func SetTransportHandlers(name string, handlerNames []string) error {
+	for _, hName := range handlerNames {
 		n, path, err := initPlugin(hName)
 		if err != nil {
 			return errors.Wrapf(err, "failed to open handler constructor 'New' in binary %s", path)
@@ -64,18 +77,25 @@ func SetTransport(name string, mode string, handlers []string, config interface{
 			return fmt.Errorf("plugin %s constructor 'New' is not of type 'handler.NewFn'", name)
 		}
 
-		transports[name].handlers = append(transports[name].handlers, new())
-	}
-
-	if config == nil {
-		return nil
-	}
-
-	err = transports[name].instance.Config(config)
-	if err != nil {
-		return err
+		handlers[name] = append(handlers[name], new())
 	}
 	return nil
+}
+
+//RunTransports spins off tranpsort + handler processes
+func RunTransports(wg *sync.WaitGroup) {
+	for name, t := range transports {
+		exchange := make(chan []byte)
+
+		wg.Add(2)
+		go t.Run(wg, exchange)
+		go func(wg *sync.WaitGroup, name string) {
+			defer wg.Done()
+			for _, handler := range handlers[name] {
+				handler.Handle(<-exchange)
+			}
+		}(wg, name)
+	}
 }
 
 // helper functions

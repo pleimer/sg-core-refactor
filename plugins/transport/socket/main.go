@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
 )
@@ -15,8 +16,9 @@ var Config struct {
 type Socket struct{}
 
 //Run implements type Transport
-func (s *Socket) Run() {
-	fmt.Println("Running the socket!")
+func (s *Socket) Run(wg *sync.WaitGroup, t chan []byte) {
+	defer wg.Done()
+	t <- []byte("hello!")
 }
 
 //Config implements type Transport
