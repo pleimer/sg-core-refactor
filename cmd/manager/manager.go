@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/infrawatch/apputils/logging"
 	"github.com/infrawatch/sg-core-refactor/pkg/application"
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
@@ -20,6 +21,7 @@ var (
 	handlers     map[string][]handler.Handler
 	applications map[string]application.Application
 	pluginPath   string
+	logger       *logging.Logger
 )
 
 func init() {
@@ -34,10 +36,9 @@ func SetPluginDir(path string) {
 	pluginPath = path
 }
 
-//SetReceiver set up transport plugin with configuration.
-func SetReceiver(transportName string, mode string, handlers []string, config interface{}) error {
-
-	return nil
+//SetLogger set logger
+func SetLogger(l *logging.Logger) {
+	logger = l
 }
 
 //InitTransport load tranpsort binary and initialize with config
@@ -92,7 +93,13 @@ func RunTransports(wg *sync.WaitGroup) {
 		go func(wg *sync.WaitGroup, name string) {
 			defer wg.Done()
 			for _, handler := range handlers[name] {
-				handler.Handle(<-exchange)
+				res, err := handler.Handle(<-exchange)
+				if err != nil {
+					logger.Metadata(logging.Metadata{"error": err})
+					logger.Error("failed handling message")
+				}
+				logger.Metadata(logging.Metadata{"result": string(res)})
+				logger.Info("handled message")
 			}
 		}(wg, name)
 	}

@@ -1,8 +1,6 @@
 package main
 
 import (
-	"fmt"
-
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
 )
@@ -10,8 +8,7 @@ import (
 type collectdMetricsHandler struct{}
 
 func (c *collectdMetricsHandler) Handle(msg []byte) ([]byte, error) {
-	fmt.Println(string(msg))
-	return nil, nil
+	return msg, nil
 }
 
 func (c *collectdMetricsHandler) Type() data.Type {
