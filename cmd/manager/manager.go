@@ -43,14 +43,14 @@ func SetLogger(l *logging.Logger) {
 
 //InitTransport load tranpsort binary and initialize with config
 func InitTransport(name string, mode string, config interface{}) error {
-	n, path, err := initPlugin(name)
+	n, err := initPlugin(name)
 	if err != nil {
-		return errors.Wrapf(err, "failed to open transport constructor 'New' in binary %s", path)
+		return errors.Wrap(err, "failed initializing transport")
 	}
 
 	new, ok := n.(func() transport.Transport)
 	if !ok {
-		return fmt.Errorf("plugin %s constructor 'New' is not of type 'transport.NewFn'", name)
+		return fmt.Errorf("plugin %s constructor 'New' is not of type 'func() transport.Transport'", name)
 	}
 
 	transports[name] = new()
@@ -69,13 +69,13 @@ func InitTransport(name string, mode string, config interface{}) error {
 //SetTransportHandlers load handlers binaries for transport
 func SetTransportHandlers(name string, handlerNames []string) error {
 	for _, hName := range handlerNames {
-		n, path, err := initPlugin(hName)
+		n, err := initPlugin(hName)
 		if err != nil {
-			return errors.Wrapf(err, "failed to open handler constructor 'New' in binary %s", path)
+			return errors.Wrap(err, "failed initializing handler")
 		}
 		new, ok := n.(func() handler.Handler)
 		if !ok {
-			return fmt.Errorf("plugin %s constructor 'New' is not of type 'handler.NewFn'", name)
+			return fmt.Errorf("plugin %s constructor 'New' is not of type 'func() handler.Handler'", name)
 		}
 
 		handlers[name] = append(handlers[name], new())
@@ -107,14 +107,14 @@ func RunTransports(wg *sync.WaitGroup) {
 
 // helper functions
 
-func initPlugin(name string) (plugin.Symbol, string, error) {
+func initPlugin(name string) (plugin.Symbol, error) {
 	bin := strings.Join([]string{name, "so"}, ".")
 	path := filepath.Join(pluginPath, bin)
 	p, err := plugin.Open(path)
 	if err != nil {
-		return nil, "", errors.Wrapf(err, "failed to open plugin binary %s", path)
+		return nil, errors.Wrapf(err, "failed to open binary %s", path)
 	}
 
 	n, err := p.Lookup("New")
-	return n, path, err
+	return n, err
 }
