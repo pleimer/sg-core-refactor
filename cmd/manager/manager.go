@@ -9,17 +9,19 @@ import (
 
 	"github.com/infrawatch/apputils/logging"
 	"github.com/infrawatch/sg-core-refactor/pkg/application"
+	"github.com/infrawatch/sg-core-refactor/pkg/bus"
+	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
 	"github.com/pkg/errors"
 )
 
-// TODO: give transport and associated handlers the same channel to talk to eachother with
-
 var (
 	transports   map[string]transport.Transport
 	handlers     map[string][]handler.Handler
 	applications map[string]application.Application
+	eventBus     bus.EventBus
+	metricBus    bus.MetricBus
 	pluginPath   string
 	logger       *logging.Logger
 )
@@ -66,6 +68,31 @@ func InitTransport(name string, mode string, config interface{}) error {
 	return nil
 }
 
+//InitApplication initialize application plugin with configuration
+func InitApplication(name string, config interface{}) error {
+	n, err := initPlugin(name)
+	if err != nil {
+		return errors.Wrap(err, "failed initializing application plugin")
+	}
+
+	new, ok := n.(func() application.Application)
+	if !ok {
+		return fmt.Errorf("plugin %s constructor 'New' is not of type 'func() application.Application'", name)
+	}
+
+	applications[name] = new()
+
+	if config == nil {
+		return nil
+	}
+
+	err = applications[name].Config(config)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 //SetTransportHandlers load handlers binaries for transport
 func SetTransportHandlers(name string, handlerNames []string) error {
 	for _, hName := range handlerNames {
@@ -97,11 +124,27 @@ func RunTransports(wg *sync.WaitGroup) {
 				if err != nil {
 					logger.Metadata(logging.Metadata{"error": err})
 					logger.Error("failed handling message")
+					continue
 				}
-				logger.Metadata(logging.Metadata{"result": string(res)})
-				logger.Info("handled message")
+
+				switch m := res.(type) {
+				case data.Event:
+					eventBus.Publish(m)
+				case data.Metric:
+					metricBus.Publish(m)
+				default:
+					logger.Error("cannot publish unrecognized type to bus")
+				}
 			}
 		}(wg, name)
+	}
+}
+
+//RunApplications spins off application processes
+func RunApplications(wg *sync.WaitGroup) {
+	for _, a := range applications {
+		wg.Add(1)
+		go a.Run(wg, &eventBus)
 	}
 }
 

@@ -20,7 +20,9 @@ var config struct {
 		Config   interface{}
 	} `validate:"dive"`
 	Applications []struct {
-	}
+		Name   string `validate:"required"`
+		Config interface{}
+	} `validate:"dive"`
 }
 
 func parseConfig(r io.Reader) error {

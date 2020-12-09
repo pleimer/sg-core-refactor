@@ -7,8 +7,8 @@ import (
 
 type collectdMetricsHandler struct{}
 
-func (c *collectdMetricsHandler) Handle(msg []byte) ([]byte, error) {
-	return msg, nil
+func (c *collectdMetricsHandler) Handle(msg []byte) (interface{}, error) {
+	return data.Event{Message: string(msg)}, nil
 }
 
 func (c *collectdMetricsHandler) Type() data.Type {

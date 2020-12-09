@@ -17,7 +17,8 @@ func (t Type) String() string {
 }
 
 // Event internal event type
-type Event interface {
+type Event struct {
+	Message string
 }
 
 // Metric internal metric type

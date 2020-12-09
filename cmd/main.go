@@ -55,15 +55,27 @@ func main() {
 		err = manager.SetTransportHandlers(tConfig.Name, tConfig.Handlers)
 		if err != nil {
 			logger.Metadata(log.Metadata{"transport": tConfig.Name, "error": err})
-			logger.Error("failed loading handlers for transport")
+			logger.Warn("transport handlers failed to load")
 			continue
 		}
 		logger.Metadata(log.Metadata{"transport": tConfig.Name})
 		logger.Info("loaded transport")
 	}
 
+	for _, aConfig := range config.Applications {
+		err = manager.InitApplication(aConfig.Name, aConfig.Config)
+		if err != nil {
+			logger.Metadata(log.Metadata{"application": aConfig.Name, "error": err})
+			logger.Warn("failed configuring application")
+			continue
+		}
+		logger.Metadata(log.Metadata{"application": aConfig.Name})
+		logger.Info("loaded application plugin")
+	}
+
 	wg := new(sync.WaitGroup)
 	manager.RunTransports(wg)
+	manager.RunApplications(wg)
 
 	wg.Wait()
 }

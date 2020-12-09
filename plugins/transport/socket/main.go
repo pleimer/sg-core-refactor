@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"sync"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
@@ -18,12 +17,11 @@ type Socket struct{}
 //Run implements type Transport
 func (s *Socket) Run(wg *sync.WaitGroup, t chan []byte) {
 	defer wg.Done()
-	t <- []byte("hello!")
+	t <- []byte("from the socket")
 }
 
 //Config implements type Transport
 func (s *Socket) Config(c interface{}) error {
-	fmt.Println(c)
 	return nil
 }
 

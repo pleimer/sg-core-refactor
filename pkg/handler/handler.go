@@ -6,7 +6,7 @@ import "github.com/infrawatch/sg-core-refactor/pkg/data"
 
 // Handler
 type Handler interface {
-	Handle([]byte) ([]byte, error)
+	Handle([]byte) (interface{}, error)
 	Type() data.Type
 }
 
