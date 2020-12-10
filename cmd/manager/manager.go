@@ -14,6 +14,7 @@ import (
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
 	"github.com/pkg/errors"
+	"gopkg.in/yaml.v2"
 )
 
 var (
@@ -83,7 +84,12 @@ func InitTransport(name string, mode string, config interface{}) error {
 		return nil
 	}
 
-	err = transports[name].Config(config)
+	c, err := yaml.Marshal(config)
+	if err != nil {
+		return errors.Wrapf(err, "failed parsing transport config for '%s'", name)
+	}
+
+	err = transports[name].Config(c)
 	if err != nil {
 		return err
 	}
@@ -143,14 +149,10 @@ func SetTransportHandlers(name string, handlerNames []string) error {
 //RunTransports spins off tranpsort + handler processes
 func RunTransports(wg *sync.WaitGroup) {
 	for name, t := range transports {
-		exchange := make(chan []byte)
-
-		wg.Add(2)
-		go t.Run(wg, exchange)
-		go func(wg *sync.WaitGroup, name string) {
-			defer wg.Done()
+		wg.Add(1)
+		go t.Run(wg, func(d []byte) {
 			for _, handler := range metricHandlers[name] {
-				res, err := handler.Handle(<-exchange)
+				res, err := handler.Handle(d)
 				if err != nil {
 					logger.Metadata(logging.Metadata{"error": err})
 					logger.Error("failed handling message")
@@ -159,7 +161,7 @@ func RunTransports(wg *sync.WaitGroup) {
 				metricBus.Publish(res)
 			}
 			for _, handler := range eventHandlers[name] {
-				res, err := handler.Handle(<-exchange)
+				res, err := handler.Handle(d)
 				if err != nil {
 					logger.Metadata(logging.Metadata{"error": err})
 					logger.Error("failed handling message")
@@ -167,7 +169,7 @@ func RunTransports(wg *sync.WaitGroup) {
 				}
 				eventBus.Publish(res)
 			}
-		}(wg, name)
+		})
 	}
 }
 

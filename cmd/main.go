@@ -9,6 +9,7 @@ import (
 
 	log "github.com/infrawatch/apputils/logging"
 	"github.com/infrawatch/sg-core-refactor/cmd/manager"
+	"github.com/infrawatch/sg-core-refactor/pkg/config"
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
 )
 
@@ -19,7 +20,7 @@ func main() {
 		fmt.Printf("Usage: %s [OPTIONS]\n\nAvailable options:\n", os.Args[0])
 		flag.PrintDefaults()
 
-		fmt.Printf("\n\nDefault configurations:\n\n%s", config.String())
+		fmt.Printf("\n\nDefault configurations:\n\n%s", string(configuration.Bytes()))
 	}
 	flag.Parse()
 
@@ -32,11 +33,11 @@ func main() {
 	file, err := os.Open(*configPath)
 	if err != nil {
 		logger.Metadata(log.Metadata{"error": err})
-		logger.Error("failed opening config file")
+		logger.Error("failed opening configuration file")
 		return
 	}
 
-	err = parseConfig(file)
+	err = config.ParseConfig(file, &configuration)
 	if err != nil {
 		logger.Metadata(log.Metadata{"error": err})
 		logger.Error("failed parsing config file")
@@ -44,9 +45,9 @@ func main() {
 	}
 
 	manager.SetLogger(logger)
-	manager.SetPluginDir(config.PluginDir)
+	manager.SetPluginDir(configuration.PluginDir)
 
-	for _, tConfig := range config.Transports {
+	for _, tConfig := range configuration.Transports {
 		err = manager.InitTransport(tConfig.Name, tConfig.Mode, tConfig.Config)
 		if err != nil {
 			logger.Metadata(log.Metadata{"transport": tConfig.Name, "error": err})
@@ -63,7 +64,7 @@ func main() {
 		logger.Info("loaded transport")
 	}
 
-	for _, aConfig := range config.Applications {
+	for _, aConfig := range configuration.Applications {
 		err = manager.InitApplication(aConfig.Name, aConfig.Config)
 		if err != nil {
 			logger.Metadata(log.Metadata{"application": aConfig.Name, "error": err})

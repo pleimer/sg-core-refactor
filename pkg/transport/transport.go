@@ -31,11 +31,12 @@ func (m Mode) FromString(s string) {
 	}[strings.ToLower(s)]
 }
 
-//Transport type listens on one interface and delivers data to core
-type Transport interface {
-	Config(interface{}) error
-	Run(*sync.WaitGroup, chan []byte)
-}
+//WriteFn func type for writing from transport to handlers
+type WriteFn func([]byte)
 
-//NewFn transport New function must be of this type
-type NewFn func() Transport
+//Transport type listens on one interface and delivers data to core
+//TODO: give transports a writer to send logs to
+type Transport interface {
+	Config([]byte) error
+	Run(*sync.WaitGroup, WriteFn) error
+}

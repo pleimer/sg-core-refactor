@@ -22,9 +22,9 @@ func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan d
 	for {
 		select {
 		case ev := <-eChan:
-			fmt.Printf("Received event with message: %s\n", ev.Message)
+			fmt.Printf("Prometheus received event with message: %s\n", ev.Message)
 		case m := <-mChan:
-			fmt.Printf("Received event with message: %s\n", m.Message)
+			fmt.Printf("Prometheus received metric with message: %s\n", m.Message)
 		}
 	}
 }
