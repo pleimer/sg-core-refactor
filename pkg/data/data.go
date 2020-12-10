@@ -22,5 +22,6 @@ type Event struct {
 }
 
 // Metric internal metric type
-type Metric interface {
+type Metric struct {
+	Message string
 }

@@ -8,8 +8,7 @@ import (
 
 /* TODO: optimize this
 channels are not particularily fast, best to avoid them in the fastpath and use Mutexes instead
-benchmark performance with channels and object allocation
-benchmoark without those two things
+benchmark implementation with callback vs channels here
 */
 
 //EventBus bus for data.Event type

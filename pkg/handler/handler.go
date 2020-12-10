@@ -4,11 +4,12 @@ import "github.com/infrawatch/sg-core-refactor/pkg/data"
 
 // package handler contains the interface description for handler plugins
 
-// Handler
-type Handler interface {
-	Handle([]byte) (interface{}, error)
-	Type() data.Type
+//MetricHandler mangle messages to place on metric bus
+type MetricHandler interface {
+	Handle([]byte) (data.Metric, error)
 }
 
-// NewFn New func must be of this type
-type NewFn func() Handler
+//EventHandler mangle messages to place on event bus
+type EventHandler interface {
+	Handle([]byte) (data.Event, error)
+}

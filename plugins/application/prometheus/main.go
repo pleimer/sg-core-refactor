@@ -5,23 +5,28 @@ import (
 	"sync"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/application"
-	"github.com/infrawatch/sg-core-refactor/pkg/bus"
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
 )
+
+//Application plugins should also provide a callback function with the data
+// and the Run() function is separate for
 
 //Prometheus plugin for interfacing with Prometheus
 type Prometheus struct {
 }
 
 //Run run scrape endpoint
-func (p *Prometheus) Run(wg *sync.WaitGroup, t interface{}) {
+func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan data.Metric) {
 	defer wg.Done()
 
-	c := make(chan data.Event)
-	b := t.(*bus.EventBus)
-	b.Subscribe(c)
-
-	fmt.Printf("prometheus app received event: %s\n", (<-c).Message)
+	for {
+		select {
+		case ev := <-eChan:
+			fmt.Printf("Received event with message: %s\n", ev.Message)
+		case m := <-mChan:
+			fmt.Printf("Received event with message: %s\n", m.Message)
+		}
+	}
 }
 
 //Config implements application.Application

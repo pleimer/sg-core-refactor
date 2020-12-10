@@ -17,20 +17,42 @@ import (
 )
 
 var (
-	transports   map[string]transport.Transport
-	handlers     map[string][]handler.Handler
-	applications map[string]application.Application
-	eventBus     bus.EventBus
-	metricBus    bus.MetricBus
-	pluginPath   string
-	logger       *logging.Logger
+	transports     map[string]transport.Transport
+	metricHandlers map[string][]handler.MetricHandler
+	eventHandlers  map[string][]handler.EventHandler
+	applications   map[string]application.Application
+	eventBus       bus.EventBus
+	metricBus      bus.MetricBus
+	pluginPath     string
+	logger         *logging.Logger
 )
 
 func init() {
 	transports = map[string]transport.Transport{}
-	handlers = map[string][]handler.Handler{}
+	metricHandlers = map[string][]handler.MetricHandler{}
+	eventHandlers = map[string][]handler.EventHandler{}
 	applications = map[string]application.Application{}
 	pluginPath = "/usr/lib64/sg-core"
+}
+
+func eventHandleDecorator(data []byte, call func([]byte) (data.Event, error)) {
+	e, err := call(data)
+	if err != nil {
+		logger.Metadata(logging.Metadata{"error": err})
+		logger.Error("cannot publish event to event bus")
+		return
+	}
+	eventBus.Publish(e)
+}
+
+func eventMetricDecorator(data []byte, call func([]byte) (data.Metric, error)) {
+	e, err := call(data)
+	if err != nil {
+		logger.Metadata(logging.Metadata{"error": err})
+		logger.Error("cannot publish event to event bus")
+		return
+	}
+	metricBus.Publish(e)
 }
 
 //SetPluginDir set directory path containing plugin binaries
@@ -52,7 +74,7 @@ func InitTransport(name string, mode string, config interface{}) error {
 
 	new, ok := n.(func() transport.Transport)
 	if !ok {
-		return fmt.Errorf("plugin %s constructor 'New' is not of type 'func() transport.Transport'", name)
+		return fmt.Errorf("plugin %s constructor 'New' did not return type 'transport.Transport'", name)
 	}
 
 	transports[name] = new()
@@ -77,7 +99,7 @@ func InitApplication(name string, config interface{}) error {
 
 	new, ok := n.(func() application.Application)
 	if !ok {
-		return fmt.Errorf("plugin %s constructor 'New' is not of type 'func() application.Application'", name)
+		return fmt.Errorf("plugin %s constructor 'New' did not return type 'application.Application'", name)
 	}
 
 	applications[name] = new()
@@ -100,12 +122,20 @@ func SetTransportHandlers(name string, handlerNames []string) error {
 		if err != nil {
 			return errors.Wrap(err, "failed initializing handler")
 		}
-		new, ok := n.(func() handler.Handler)
-		if !ok {
-			return fmt.Errorf("plugin %s constructor 'New' is not of type 'func() handler.Handler'", name)
-		}
 
-		handlers[name] = append(handlers[name], new())
+		var hType string
+		switch new := n.(type) {
+		case (func() handler.MetricHandler):
+			metricHandlers[name] = append(metricHandlers[name], new())
+			hType = "MetricHandler"
+		case (func() handler.EventHandler):
+			eventHandlers[name] = append(eventHandlers[name], new())
+			hType = "EventHandler"
+		default:
+			return fmt.Errorf("handler %s constructor did not return type handler.EventHandler or handler.MetricsHandler", hName)
+		}
+		logger.Metadata(logging.Metadata{"handler": hName, "type": hType})
+		logger.Info("initialized handler")
 	}
 	return nil
 }
@@ -119,22 +149,23 @@ func RunTransports(wg *sync.WaitGroup) {
 		go t.Run(wg, exchange)
 		go func(wg *sync.WaitGroup, name string) {
 			defer wg.Done()
-			for _, handler := range handlers[name] {
+			for _, handler := range metricHandlers[name] {
 				res, err := handler.Handle(<-exchange)
 				if err != nil {
 					logger.Metadata(logging.Metadata{"error": err})
 					logger.Error("failed handling message")
 					continue
 				}
-
-				switch m := res.(type) {
-				case data.Event:
-					eventBus.Publish(m)
-				case data.Metric:
-					metricBus.Publish(m)
-				default:
-					logger.Error("cannot publish unrecognized type to bus")
+				metricBus.Publish(res)
+			}
+			for _, handler := range eventHandlers[name] {
+				res, err := handler.Handle(<-exchange)
+				if err != nil {
+					logger.Metadata(logging.Metadata{"error": err})
+					logger.Error("failed handling message")
+					continue
 				}
+				eventBus.Publish(res)
 			}
 		}(wg, name)
 	}
@@ -143,8 +174,13 @@ func RunTransports(wg *sync.WaitGroup) {
 //RunApplications spins off application processes
 func RunApplications(wg *sync.WaitGroup) {
 	for _, a := range applications {
+		eChan := make(chan data.Event)
+		mChan := make(chan data.Metric)
+
+		eventBus.Subscribe(eChan)
+		metricBus.Subscribe(mChan)
 		wg.Add(1)
-		go a.Run(wg, &eventBus)
+		go a.Run(wg, eChan, mChan)
 	}
 }
 

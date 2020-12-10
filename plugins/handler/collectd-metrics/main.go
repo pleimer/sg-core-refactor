@@ -1,21 +1,20 @@
 package main
 
 import (
+	"github.com/infrawatch/sg-core-refactor/pkg/bus"
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
 )
 
-type collectdMetricsHandler struct{}
-
-func (c *collectdMetricsHandler) Handle(msg []byte) (interface{}, error) {
-	return data.Event{Message: string(msg)}, nil
+type collectdMetricsHandler struct {
+	bus bus.MetricBus
 }
 
-func (c *collectdMetricsHandler) Type() data.Type {
-	return data.METRIC
+func (c *collectdMetricsHandler) Handle(msg []byte) (data.Metric, error) {
+	return data.Metric{Message: string(msg)}, nil
 }
 
 //New create new collectdMetricsHandler object
-func New() handler.Handler {
+func New() handler.MetricHandler {
 	return &collectdMetricsHandler{}
 }
