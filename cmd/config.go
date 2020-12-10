@@ -12,7 +12,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var config struct {
+type configT struct {
+	PluginDir  string
 	Transports []struct {
 		Name     string `validate:"required"`
 		Mode     string `validate:"required"`
@@ -23,6 +24,15 @@ var config struct {
 		Name   string `validate:"required"`
 		Config interface{}
 	} `validate:"dive"`
+}
+
+func (ct *configT) String() string {
+	res, _ := yaml.Marshal(ct)
+	return string(res)
+}
+
+var config configT = configT{
+	PluginDir: "/usr/lib64/sg-core/",
 }
 
 func parseConfig(r io.Reader) error {

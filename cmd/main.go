@@ -14,11 +14,12 @@ import (
 
 func main() {
 	configPath := flag.String("config", "/etc/sg-core.conf.yaml", "configuration file path")
-	pluginDir := flag.String("pluginDir", "/usr/lib64/sg-core/", "path to plugin binaries")
 	//logLevel := flag.String("logLevel", "ERROR", "log level")
 	flag.Usage = func() {
 		fmt.Printf("Usage: %s [OPTIONS]\n\nAvailable options:\n", os.Args[0])
 		flag.PrintDefaults()
+
+		fmt.Printf("\n\nDefault configurations:\n\n%s", config.String())
 	}
 	flag.Parse()
 
@@ -43,7 +44,7 @@ func main() {
 	}
 
 	manager.SetLogger(logger)
-	manager.SetPluginDir(*pluginDir)
+	manager.SetPluginDir(config.PluginDir)
 
 	for _, tConfig := range config.Transports {
 		err = manager.InitTransport(tConfig.Name, tConfig.Mode, tConfig.Config)
