@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/config"
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
@@ -55,7 +56,8 @@ func (s *Socket) Run(wg *sync.WaitGroup, w transport.WriteFn) error {
 	// 	t <- msgBuffer
 	// }
 
-	for i := 0; i < 30; i++ {
+	for i := 0; i < 100; i++ {
+		time.Sleep(time.Second)
 		ret := fmt.Sprintf("message from socket #%d", i)
 		w([]byte(ret))
 	}

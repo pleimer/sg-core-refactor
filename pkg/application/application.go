@@ -10,6 +10,6 @@ import (
 
 //Application describes application plugin interfaces
 type Application interface {
-	Config(interface{}) error
+	Config([]byte) error
 	Run(*sync.WaitGroup, chan data.Event, chan data.Metric)
 }

@@ -103,18 +103,23 @@ func InitApplication(name string, config interface{}) error {
 		return errors.Wrap(err, "failed initializing application plugin")
 	}
 
-	new, ok := n.(func() application.Application)
+	new, ok := n.(func(*logging.Logger) application.Application)
 	if !ok {
 		return fmt.Errorf("plugin %s constructor 'New' did not return type 'application.Application'", name)
 	}
 
-	applications[name] = new()
+	applications[name] = new(logger)
 
 	if config == nil {
 		return nil
 	}
 
-	err = applications[name].Config(config)
+	c, err := yaml.Marshal(config)
+	if err != nil {
+		return errors.Wrapf(err, "failed parsing application plugin config for '%s'", name)
+	}
+
+	err = applications[name].Config(c)
 	if err != nil {
 		return err
 	}

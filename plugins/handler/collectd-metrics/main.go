@@ -11,7 +11,14 @@ type collectdMetricsHandler struct {
 }
 
 func (c *collectdMetricsHandler) Handle(msg []byte) (data.Metric, error) {
-	return data.Metric{Message: string(msg)}, nil
+	return data.Metric{
+		Name: "collectd",
+		Labels: map[string]string{
+			"host": "localhost",
+		},
+		Type:  data.GAUGE,
+		Value: 123421.2,
+	}, nil
 }
 
 //New create new collectdMetricsHandler object
