@@ -56,7 +56,7 @@ func (s *Socket) Run(wg *sync.WaitGroup, w transport.WriteFn) error {
 	// 	t <- msgBuffer
 	// }
 
-	for i := 0; i < 100; i++ {
+	for i := 0; i < 100000; i++ {
 		time.Sleep(time.Second)
 		ret := fmt.Sprintf("message from socket #%d", i)
 		w([]byte(ret))

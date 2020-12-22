@@ -6,7 +6,7 @@ import "github.com/infrawatch/sg-core-refactor/pkg/data"
 
 //MetricHandler mangle messages to place on metric bus
 type MetricHandler interface {
-	Handle([]byte) (data.Metric, error)
+	Handle([]byte) ([]data.Metric, error)
 }
 
 //EventHandler mangle messages to place on event bus

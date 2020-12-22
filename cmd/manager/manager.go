@@ -46,14 +46,14 @@ func eventHandleDecorator(data []byte, call func([]byte) (data.Event, error)) {
 	eventBus.Publish(e)
 }
 
-func eventMetricDecorator(data []byte, call func([]byte) (data.Metric, error)) {
-	e, err := call(data)
+func eventMetricDecorator(data []byte, call func([]byte) ([]data.Metric, error)) {
+	m, err := call(data)
 	if err != nil {
 		logger.Metadata(logging.Metadata{"error": err})
 		logger.Error("cannot publish event to event bus")
 		return
 	}
-	metricBus.Publish(e)
+	metricBus.Publish(m)
 }
 
 //SetPluginDir set directory path containing plugin binaries
@@ -182,7 +182,7 @@ func RunTransports(wg *sync.WaitGroup) {
 func RunApplications(wg *sync.WaitGroup) {
 	for _, a := range applications {
 		eChan := make(chan data.Event)
-		mChan := make(chan data.Metric)
+		mChan := make(chan []data.Metric)
 
 		eventBus.Subscribe(eChan)
 		metricBus.Subscribe(mChan)

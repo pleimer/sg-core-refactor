@@ -47,6 +47,7 @@ func (p *Prometheus) Describe(ch chan<- *prometheus.Desc) {
 
 //Collect implements prometheus.Collector
 func (p *Prometheus) Collect(ch chan<- prometheus.Metric) {
+	p.logger.Info("prometheus attempted a scrape")
 	errs := []error{}
 	for _, metric := range p.metrics {
 		labelValues := []string{}
@@ -71,7 +72,7 @@ func (p *Prometheus) Collect(ch chan<- prometheus.Metric) {
 }
 
 //Run run scrape endpoint
-func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan data.Metric) {
+func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan []data.Metric) {
 	defer wg.Done()
 	registry := prometheus.NewRegistry()
 
@@ -92,6 +93,8 @@ func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan d
 		}
 	})
 
+	registry.MustRegister(p)
+
 	//run exporter fro prometheus to scrape
 	wg.Add(1)
 	go func(wg *sync.WaitGroup) {
@@ -110,11 +113,13 @@ func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan d
 		select {
 		case ev := <-eChan:
 			fmt.Printf("Prometheus received event with message: %s\n", ev.Message)
-		case m := <-mChan:
+		case metrics := <-mChan:
 			// update descriptions
-			p.updateDescs(m.Name, "", m.Labels)
-			p.updateMetrics(m)
-			fmt.Printf("Prometheus received metric: %v\n", m)
+			for _, m := range metrics {
+				fmt.Printf("Prometheus received metric: %v\n", m)
+				p.updateDescs(m.Name, "", m.Labels)
+				p.updateMetrics(m)
+			}
 		}
 	}
 }
