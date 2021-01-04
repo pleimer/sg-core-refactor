@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -28,7 +29,7 @@ type Socket struct {
 }
 
 //Run implements type Transport
-func (s *Socket) Run(wg *sync.WaitGroup, w transport.WriteFn) error {
+func (s *Socket) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn) {
 	defer wg.Done()
 
 	// var laddr net.UnixAddr
@@ -56,12 +57,18 @@ func (s *Socket) Run(wg *sync.WaitGroup, w transport.WriteFn) error {
 	// 	t <- msgBuffer
 	// }
 
-	for i := 0; i < 100000; i++ {
-		time.Sleep(time.Second)
-		ret := fmt.Sprintf("message from socket #%d", i)
-		w([]byte(ret))
+	for {
+		select {
+		case <-ctx.Done():
+			goto done
+		default:
+			time.Sleep(time.Second * 1)
+			ret := fmt.Sprintf("message from socket")
+			w([]byte(ret))
+		}
 	}
-	return nil
+
+done:
 }
 
 //Config load configurations

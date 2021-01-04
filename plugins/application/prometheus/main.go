@@ -2,12 +2,15 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/infrawatch/apputils/logging"
 	"github.com/infrawatch/sg-core-refactor/pkg/application"
+	"github.com/infrawatch/sg-core-refactor/pkg/concurrent"
 	"github.com/infrawatch/sg-core-refactor/pkg/config"
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/prometheus/client_golang/prometheus"
@@ -15,46 +18,81 @@ import (
 )
 
 type configT struct {
-	Host string
-	Port int
+	Host          string
+	Port          int
+	MetricTimeout int
+}
+
+// used to expire stale metrics
+type metricExpiry struct {
+	sync.RWMutex
+	lastArrival time.Time
+	interval    float64
+	delete      func()
+}
+
+func (me *metricExpiry) keepAlive() {
+	me.Lock()
+	defer me.Unlock()
+	me.lastArrival = time.Now()
+}
+
+func (me *metricExpiry) Expired() bool {
+	me.RLock()
+	defer me.RUnlock()
+	return (time.Since(me.lastArrival).Seconds() >= me.interval)
+}
+
+func (me *metricExpiry) Delete() {
+	me.Lock()
+	defer me.Unlock()
+	me.delete()
 }
 
 //Prometheus plugin for interfacing with Prometheus
 type Prometheus struct {
 	configuration configT
 	logger        *logging.Logger
-	descriptions  map[string]*prometheus.Desc
-	metrics       map[string]data.Metric
+	descriptions  *concurrent.Map
+	metrics       *concurrent.Map
+	expiry        *expiryProc
+	expirys       map[string]*metricExpiry
 }
 
 //New constructor
 func New(l *logging.Logger) application.Application {
 	return &Prometheus{
 		configuration: configT{
-			Host: "127.0.0.1",
-			Port: 3000,
+			Host:          "127.0.0.1",
+			Port:          3000,
+			MetricTimeout: 20,
 		},
 		logger:       l,
-		descriptions: map[string]*prometheus.Desc{},
-		metrics:      map[string]data.Metric{},
+		descriptions: concurrent.NewMap(),
+		metrics:      concurrent.NewMap(),
+		expiry:       newExpiryProc(),
+		expirys:      map[string]*metricExpiry{},
 	}
 }
 
 //Describe implements prometheus.Collector
 func (p *Prometheus) Describe(ch chan<- *prometheus.Desc) {
-
+	for desc := range p.descriptions.Iter() {
+		ch <- desc.Value.(*prometheus.Desc)
+	}
 }
 
 //Collect implements prometheus.Collector
 func (p *Prometheus) Collect(ch chan<- prometheus.Metric) {
-	p.logger.Info("prometheus attempted a scrape")
 	errs := []error{}
-	for _, metric := range p.metrics {
+	for item := range p.metrics.Iter() {
+		metric := item.Value.(data.Metric)
 		labelValues := []string{}
 		for _, val := range metric.Labels { //TODO: optimize this
 			labelValues = append(labelValues, val)
 		}
-		pMetric, err := prometheus.NewConstMetric(p.descriptions[metric.Name], metricTypeToPromValueType(metric.Type), metric.Value, labelValues...)
+		desc, _ := p.descriptions.Get(metric.Name)
+		pMetric, err := prometheus.NewConstMetric(desc.(*prometheus.Desc), metricTypeToPromValueType(metric.Type), metric.Value, labelValues...)
 		if err != nil {
 			errs = append(errs, err)
 		}
@@ -72,7 +110,7 @@ func (p *Prometheus) Collect(ch chan<- prometheus.Metric) {
 }
 
 //Run run scrape endpoint
-func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan []data.Metric) {
+func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan data.Event, mChan chan []data.Metric) {
 	defer wg.Done()
 	registry := prometheus.NewRegistry()
 
@@ -95,7 +133,7 @@ func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan [
 
 	registry.MustRegister(p)
 
-	//run exporter fro prometheus to scrape
+	//run exporter for prometheus to scrape
 	wg.Add(1)
 	go func(wg *sync.WaitGroup) {
 		defer wg.Done()
@@ -109,8 +147,13 @@ func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan [
 		}
 	}(wg)
 
+	//run expiry process
+	go p.expiry.run(ctx)
+
 	for {
 		select {
+		case <-ctx.Done():
+			goto done
 		case ev := <-eChan:
 			fmt.Printf("Prometheus received event with message: %s\n", ev.Message)
 		case metrics := <-mChan:
@@ -122,6 +165,7 @@ func (p *Prometheus) Run(wg *sync.WaitGroup, eChan chan data.Event, mChan chan [
 			}
 		}
 	}
+done:
 }
 
 //Config implements application.Application
@@ -135,17 +179,31 @@ func (p *Prometheus) Config(c []byte) error {
 
 // updateDescs update prometheus descriptions
 func (p *Prometheus) updateDescs(name string, description string, labels map[string]string) {
-	if _, found := p.descriptions[name]; !found {
+	if _, found := p.descriptions.Get(name); !found {
 		keys := make([]string, 0, len(labels))
 		for k := range labels {
 			keys = append(keys, k)
 		}
-		p.descriptions[name] = prometheus.NewDesc(name, description, keys, nil)
+
+		p.descriptions.Set(name, prometheus.NewDesc(name, description, keys, nil))
 	}
 }
 
 func (p *Prometheus) updateMetrics(metric data.Metric) {
-	p.metrics[metric.Name] = metric
+	if _, found := p.expirys[metric.Name]; !found {
+		exp := metricExpiry{
+			interval: 20,
+			delete: func() {
+				p.metrics.Delete(metric.Name)
+				p.descriptions.Delete(metric.Name)
+				delete(p.expirys, metric.Name)
+			},
+		}
+		p.expirys[metric.Name] = &exp
+		p.expiry.register(&exp)
+	}
+	p.metrics.Set(metric.Name, metric)
+	p.expirys[metric.Name].keepAlive()
 }
 
 // helper functions

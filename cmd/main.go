@@ -10,7 +10,6 @@ import (
 	log "github.com/infrawatch/apputils/logging"
 	"github.com/infrawatch/sg-core-refactor/cmd/manager"
 	"github.com/infrawatch/sg-core-refactor/pkg/config"
-	"github.com/infrawatch/sg-core-refactor/pkg/data"
 )
 
 func main() {
@@ -75,25 +74,10 @@ func main() {
 		logger.Info("loaded application plugin")
 	}
 
+	ctx := context.Background()
 	wg := new(sync.WaitGroup)
-	manager.RunTransports(wg)
-	manager.RunApplications(wg)
+	manager.RunTransports(ctx, wg)
+	manager.RunApplications(ctx, wg)
 
 	wg.Wait()
-}
-
-func run(ctx context.Context) {
-	metricChannel := make(chan data.Metric)
-	eventChannel := make(chan data.Metric)
-
-	for {
-		select {
-		case <-eventChannel:
-			fmt.Printf("Recieved event")
-		case <-metricChannel:
-			fmt.Printf("Recieved metric")
-		case <-ctx.Done():
-			fmt.Printf("Exiting")
-		}
-	}
 }

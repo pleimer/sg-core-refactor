@@ -1,6 +1,7 @@
 package transport
 
 import (
+	"context"
 	"strings"
 	"sync"
 )
@@ -38,5 +39,5 @@ type WriteFn func([]byte)
 //TODO: give transports a writer to send logs to
 type Transport interface {
 	Config([]byte) error
-	Run(*sync.WaitGroup, WriteFn) error
+	Run(context.Context, *sync.WaitGroup, WriteFn)
 }

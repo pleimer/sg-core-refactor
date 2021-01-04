@@ -1,6 +1,7 @@
 package manager
 
 import (
+	"context"
 	"fmt"
 	"path/filepath"
 	"plugin"
@@ -152,10 +153,10 @@ func SetTransportHandlers(name string, handlerNames []string) error {
 }
 
 //RunTransports spins off tranpsort + handler processes
-func RunTransports(wg *sync.WaitGroup) {
+func RunTransports(ctx context.Context, wg *sync.WaitGroup) {
 	for name, t := range transports {
 		wg.Add(1)
-		go t.Run(wg, func(d []byte) {
+		go t.Run(ctx, wg, func(d []byte) {
 			for _, handler := range metricHandlers[name] {
 				res, err := handler.Handle(d)
 				if err != nil {
@@ -179,7 +180,7 @@ func RunTransports(wg *sync.WaitGroup) {
 }
 
 //RunApplications spins off application processes
-func RunApplications(wg *sync.WaitGroup) {
+func RunApplications(ctx context.Context, wg *sync.WaitGroup) {
 	for _, a := range applications {
 		eChan := make(chan data.Event)
 		mChan := make(chan []data.Metric)
@@ -187,7 +188,7 @@ func RunApplications(wg *sync.WaitGroup) {
 		eventBus.Subscribe(eChan)
 		metricBus.Subscribe(mChan)
 		wg.Add(1)
-		go a.Run(wg, eChan, mChan)
+		go a.Run(ctx, wg, eChan, mChan)
 	}
 }
 

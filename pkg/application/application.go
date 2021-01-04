@@ -1,6 +1,7 @@
 package application
 
 import (
+	"context"
 	"sync"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
@@ -11,5 +12,5 @@ import (
 //Application describes application plugin interfaces
 type Application interface {
 	Config([]byte) error
-	Run(*sync.WaitGroup, chan data.Event, chan []data.Metric)
+	Run(context.Context, *sync.WaitGroup, chan data.Event, chan []data.Metric)
 }
