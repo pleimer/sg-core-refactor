@@ -3,7 +3,6 @@ package main
 import (
 	"bytes"
 	"context"
-	"fmt"
 	"sync"
 	"time"
 
@@ -63,7 +62,27 @@ func (s *Socket) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteF
 			goto done
 		default:
 			time.Sleep(time.Second * 1)
-			ret := fmt.Sprintf("message from socket")
+			ret := `[{
+				"values": [
+				  20851.0,
+				  14.0
+				],
+				"dstypes": [
+				  "derive",
+				  "derive"
+				],
+				"dsnames": [
+				  "rx",
+				  "tx"
+				],
+				"time": 1609859526.583,
+				"interval": 5,
+				"host": "db4aee71-6c98-4505-bdf2-36d987e32be7",
+				"plugin": "virt",
+				"plugin_instance": "asdf",
+				"type": "if_packets",
+				"type_instance": "tap7314021d-60"
+			  }]`
 			w([]byte(ret))
 		}
 	}

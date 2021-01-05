@@ -3,9 +3,10 @@ module github.com/infrawatch/sg-core-refactor
 go 1.14
 
 require (
-	github.com/davecgh/go-spew v1.1.1 // indirect
+	collectd.org v0.5.0
 	github.com/go-playground/universal-translator v0.17.0 // indirect
 	github.com/infrawatch/apputils v0.0.0-20201208221556-d59b03ddde31
+	github.com/json-iterator/go v1.1.10
 	github.com/kr/text v0.2.0 // indirect
 	github.com/leodido/go-urn v1.2.0 // indirect
 	github.com/pkg/errors v0.9.1

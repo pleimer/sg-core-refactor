@@ -1,0 +1,23 @@
+[
+  {
+    "values": [
+      20851,
+      14
+    ],
+    "dstypes": [
+      "derive",
+      "derive"
+    ],
+    "dsnames": [
+      "rx",
+      "tx"
+    ],
+    "time": 1609859526.583,
+    "interval": 5,
+    "host": "db4aee71-6c98-4505-bdf2-36d987e32be7",
+    "plugin": "virt",
+    "plugin_instance": "",
+    "type": "if_packets",
+    "type_instance": "tap7314021d-60"
+  }
+]

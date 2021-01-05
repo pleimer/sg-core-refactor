@@ -55,6 +55,7 @@ type Prometheus struct {
 	logger        *logging.Logger
 	descriptions  *concurrent.Map
 	metrics       *concurrent.Map
+	labelKeys     []string
 	expiry        *expiryProc
 	expirys       map[string]*metricExpiry
 }
@@ -71,12 +72,14 @@ func New(l *logging.Logger) application.Application {
 		descriptions: concurrent.NewMap(),
 		metrics:      concurrent.NewMap(),
 		expiry:       newExpiryProc(),
+		labelKeys:    []string{},
 		expirys:      map[string]*metricExpiry{},
 	}
 }
 
 //Describe implements prometheus.Collector
 func (p *Prometheus) Describe(ch chan<- *prometheus.Desc) {
+	fmt.Println("Prometheus requestiong to describe")
 	for desc := range p.descriptions.Iter() {
 		ch <- desc.Value.(*prometheus.Desc)
 	}
@@ -87,17 +90,17 @@ func (p *Prometheus) Collect(ch chan<- prometheus.Metric) {
 	errs := []error{}
 	for item := range p.metrics.Iter() {
 		metric := item.Value.(data.Metric)
-		labelValues := []string{}
-		for _, val := range metric.Labels { //TODO: optimize this
-			labelValues = append(labelValues, val)
+		labelValues := make([]string, 0, len(p.labelKeys))
+		for _, key := range p.labelKeys {
+			labelValues = append(labelValues, metric.Labels[key]) //TODO: optimize this
 		}
 		desc, _ := p.descriptions.Get(metric.Name)
 		pMetric, err := prometheus.NewConstMetric(desc.(*prometheus.Desc), metricTypeToPromValueType(metric.Type), metric.Value, labelValues...)
 		if err != nil {
 			errs = append(errs, err)
 		}
-		if metric.Time != nil {
-			ch <- prometheus.NewMetricWithTimestamp(*metric.Time, pMetric)
+		if !metric.Time.IsZero() {
+			ch <- prometheus.NewMetricWithTimestamp(metric.Time, pMetric)
 			continue
 		}
 		ch <- pMetric
@@ -147,7 +150,7 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 		}
 	}(wg)
 
-	//run expiry process
+	//run metric expiry process
 	go p.expiry.run(ctx)
 
 	for {
@@ -180,12 +183,12 @@ func (p *Prometheus) Config(c []byte) error {
 // updateDescs update prometheus descriptions
 func (p *Prometheus) updateDescs(name string, description string, labels map[string]string) {
 	if _, found := p.descriptions.Get(name); !found {
-		keys := make([]string, 0, len(labels))
+		p.labelKeys = make([]string, 0, len(labels))
 		for k := range labels {
-			keys = append(keys, k)
+			p.labelKeys = append(p.labelKeys, k)
 		}
 
-		p.descriptions.Set(name, prometheus.NewDesc(name, description, keys, nil))
+		p.descriptions.Set(name, prometheus.NewDesc(name, description, p.labelKeys, nil))
 	}
 }
 
@@ -211,6 +214,7 @@ func (p *Prometheus) updateMetrics(metric data.Metric) {
 func metricTypeToPromValueType(mType data.MetricType) prometheus.ValueType {
 	return map[data.MetricType]prometheus.ValueType{
 		data.COUNTER: prometheus.CounterValue,
+		data.DERIVE:  prometheus.CounterValue,
 		data.GAUGE:   prometheus.GaugeValue,
 		data.UNTYPED: prometheus.UntypedValue,
 	}[mType]
