@@ -8,7 +8,7 @@ Default plugins exist in /plugins. Plugins can also be hosted as separate projec
 ```bash
 # build plugins
 for i in plugins/transport/*; do go build -o bin/ -buildmode=plugin "./$i/..."; done
-for i in plugins/handler/*; do go build -o bin/ -buildmode=plugin "./$i/..."; done
+for i in plugins/handler/*; do go build -o "bin/$(basename $i).so" -buildmode=plugin "./$i/main.go"; done
 for i in plugins/application/*; do go build -o bin/ -buildmode=plugin "./$i/..."; done
 
 # build core
