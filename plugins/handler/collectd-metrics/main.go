@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
@@ -19,21 +18,21 @@ func (c *collectdMetricsHandler) Handle(blob []byte) ([]data.Metric, error) {
 		return nil, err
 	}
 
-	var metric *data.Metric
+	var ms []data.Metric
 	metrics := []data.Metric{}
 	for index, cdmetric := range *cdmetrics {
-		metric, err = createMetric(&cdmetric, index)
+		ms, err = createMetrics(&cdmetric, index)
 		if err != nil {
 			return nil, err
 		}
 
-		metrics = append(metrics, *metric)
+		metrics = append(metrics, ms...)
 	}
 
 	return metrics, nil
 }
 
-func createMetric(cdmetric *collectd.Metric, index int) (*data.Metric, error) {
+func createMetrics(cdmetric *collectd.Metric, index int) ([]data.Metric, error) {
 	if cdmetric.Host == "" {
 		return nil, fmt.Errorf("missing host: %v ", cdmetric)
 	}
@@ -53,21 +52,21 @@ func createMetric(cdmetric *collectd.Metric, index int) (*data.Metric, error) {
 		return nil, err
 	}
 
-	metricName := genMetricName(cdmetric, index)
-
-	//TODO: use cdmetric time in metric
-	fmt.Printf("Time is %s\n", cdmetric.Time.Time())
-	return &data.Metric{
-		Name:  metricName,
-		Type:  mt,
-		Value: cdmetric.Values[index],
-		Time:  time.Now(),
-		Labels: map[string]string{
-			"host":            cdmetric.Host,
-			"plugin_instance": cdmetric.PluginInstance,
-			"type_instance":   cdmetric.TypeInstance,
-		},
-	}, nil
+	var metrics []data.Metric
+	for index := range cdmetric.Dsnames {
+		metrics = append(metrics,
+			data.Metric{
+				Name:  genMetricName(cdmetric, index),
+				Type:  mt,
+				Value: cdmetric.Values[index],
+				Time:  cdmetric.Time.Time(),
+				Labels: map[string]string{
+					"host":            cdmetric.Host,
+					"plugin_instance": cdmetric.PluginInstance,
+					"type_instance":   cdmetric.TypeInstance,
+				}})
+	}
+	return metrics, nil
 }
 
 func genMetricName(cdmetric *collectd.Metric, index int) (name string) {

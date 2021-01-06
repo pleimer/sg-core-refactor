@@ -79,7 +79,6 @@ func New(l *logging.Logger) application.Application {
 
 //Describe implements prometheus.Collector
 func (p *Prometheus) Describe(ch chan<- *prometheus.Desc) {
-	fmt.Println("Prometheus requestiong to describe")
 	for desc := range p.descriptions.Iter() {
 		ch <- desc.Value.(*prometheus.Desc)
 	}
