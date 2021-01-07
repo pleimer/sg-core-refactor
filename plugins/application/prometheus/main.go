@@ -85,8 +85,8 @@ func (pc *PromCollector) Collect(ch chan<- prometheus.Metric) {
 		metric := item.Value.(data.Metric)
 		labelKeys := pc.metricLabelKeys.Get(metric.Name).([]string)
 		labelValues := make([]string, 0, len(labelKeys))
-		for labels := range pc.metricLabelKeys.Iter() {
-			labelValues = labels.Value.([]string)
+		for _, l := range labelKeys { // TODO: optimize this
+			labelValues = append(labelValues, metric.Labels[l])
 		}
 		desc := pc.descriptions.Get(metric.Name)
 		pMetric, err := prometheus.NewConstMetric(desc.(*prometheus.Desc), metricTypeToPromValueType(metric.Type), metric.Value, labelValues...)
