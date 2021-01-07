@@ -53,6 +53,27 @@ func generateMetric() []metric {
 		Type:           "if_packets",
 		TypeInstance:   "tap73125d-60",
 	},
+		{
+			Values: []float64{
+				rand.Float64() * 1000,
+				rand.Float64() * 10000,
+			},
+			Dstypes: []string{
+				"derive",
+				"counter",
+			},
+			Dsnames: []string{
+				"in",
+				"out",
+			},
+			Host:           "controller-0.redhat.local",
+			Time:           time.Now().Unix(),
+			Interval:       5,
+			Plugin:         "virt",
+			PluginInstance: "asdf",
+			Type:           "if_packets",
+			TypeInstance:   "tap73125d-60",
+		},
 	}
 }
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
@@ -9,6 +10,7 @@ import (
 )
 
 type collectdMetricsHandler struct {
+	totalMetricsReceived uint64
 }
 
 func (c *collectdMetricsHandler) Handle(blob []byte) ([]data.Metric, error) {
@@ -21,7 +23,7 @@ func (c *collectdMetricsHandler) Handle(blob []byte) ([]data.Metric, error) {
 	var ms []data.Metric
 	metrics := []data.Metric{}
 	for index, cdmetric := range *cdmetrics {
-		ms, err = createMetrics(&cdmetric, index)
+		ms, err = c.createMetrics(&cdmetric, index)
 		if err != nil {
 			return nil, err
 		}
@@ -32,7 +34,7 @@ func (c *collectdMetricsHandler) Handle(blob []byte) ([]data.Metric, error) {
 	return metrics, nil
 }
 
-func createMetrics(cdmetric *collectd.Metric, index int) ([]data.Metric, error) {
+func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric, index int) ([]data.Metric, error) {
 	if cdmetric.Host == "" {
 		return nil, fmt.Errorf("missing host: %v ", cdmetric)
 	}
@@ -66,6 +68,16 @@ func createMetrics(cdmetric *collectd.Metric, index int) ([]data.Metric, error) 
 					"type_instance":   cdmetric.TypeInstance,
 				}})
 	}
+	metrics = append(metrics, data.Metric{
+		Name:  "sg_total_metric_rcv_count",
+		Type:  data.COUNTER,
+		Value: float64(c.totalMetricsReceived),
+		Time:  time.Now(),
+		Labels: map[string]string{
+			"source": "SG",
+		},
+	})
+	c.totalMetricsReceived++
 	return metrics, nil
 }
 

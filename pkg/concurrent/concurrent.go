@@ -20,15 +20,31 @@ func NewMap() *Map {
 func (m *Map) Set(key string, value interface{}) {
 	m.Lock()
 	m.Items[key] = value
-	m.Unlock()
+	m.Unlock() //do not use defer() as it is too slow
 }
 
-//Get get item with key
-func (m *Map) Get(key string) (interface{}, bool) {
+//Contains return true if key exists
+func (m *Map) Contains(key string) bool {
 	m.RLock()
-	val, ok := m.Items[key]
+	_, ok := m.Items[key]
 	m.RUnlock()
-	return val, ok
+	return ok
+}
+
+//Len return number of map indexes
+func (m *Map) Len() int {
+	m.RLock()
+	l := len(m.Items)
+	m.RUnlock()
+	return l
+}
+
+//Get get item with key. Returns nil if does not exist
+func (m *Map) Get(key string) interface{} {
+	m.RLock()
+	val, _ := m.Items[key]
+	m.RUnlock()
+	return val
 }
 
 //Delete delete index in map
