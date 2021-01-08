@@ -196,26 +196,20 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 	})
 
 	//run exporter for prometheus to scrape
+	metricsURL := fmt.Sprintf("%s:%d", p.configuration.Host, p.configuration.Port)
+	p.logger.Info(fmt.Sprintf("Metric server at : %s", metricsURL))
+
+	srv := &http.Server{Addr: metricsURL}
+	srv.Handler = handler
+
 	wg.Add(1)
-	go func(wg *sync.WaitGroup) {
-		metricsURL := fmt.Sprintf("%s:%d", p.configuration.Host, p.configuration.Port)
-		p.logger.Info(fmt.Sprintf("Metric server at : %s", metricsURL))
-
-		srv := &http.Server{Addr: metricsURL}
-		srv.Handler = handler
-
-		go func() {
-			defer wg.Done()
-			if err := srv.ListenAndServe(); err != http.ErrServerClosed {
-				p.logger.Metadata(logging.Metadata{"error": err})
-				p.logger.Error("Metric scrape endpoint failed")
-			}
-		}()
-		if err := srv.Shutdown(ctx); err != nil {
+	go func() {
+		defer wg.Done()
+		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			p.logger.Metadata(logging.Metadata{"error": err})
-			p.logger.Error("Error while shutting down metrics endpoint")
+			p.logger.Error("Metric scrape endpoint failed")
 		}
-	}(wg)
+	}()
 
 	//run metric expiry process
 	go p.expiry.run(ctx)
@@ -223,6 +217,10 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 	for {
 		select {
 		case <-ctx.Done():
+			if err := srv.Shutdown(ctx); err != nil {
+				p.logger.Metadata(logging.Metadata{"error": err})
+				p.logger.Error("Error while shutting down metrics endpoint")
+			}
 			goto done
 		case <-eChan:
 			p.logger.Warn("Prometheus plugin received an event - disregarding")
