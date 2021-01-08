@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"os"
 	"sync"
+	"syscall"
 
+	"github.com/infrawatch/apputils/logging"
 	log "github.com/infrawatch/apputils/logging"
+	"github.com/infrawatch/apputils/system"
 	"github.com/infrawatch/sg-core-refactor/cmd/manager"
 	"github.com/infrawatch/sg-core-refactor/pkg/config"
 )
@@ -43,6 +46,13 @@ func main() {
 		return
 	}
 
+	logger.SetLogLevel(map[string]logging.LogLevel{
+		"error": logging.ERROR,
+		"warn":  logging.WARN,
+		"info":  logging.INFO,
+		"debug": logging.DEBUG,
+	}[configuration.LogLevel])
+
 	manager.SetLogger(logger)
 	manager.SetPluginDir(configuration.PluginDir)
 
@@ -74,10 +84,17 @@ func main() {
 		logger.Info("loaded application plugin")
 	}
 
-	ctx := context.Background()
+	ctx, cancelCtx := context.WithCancel(context.Background())
 	wg := new(sync.WaitGroup)
+	//run main processes
 	manager.RunTransports(ctx, wg)
 	manager.RunApplications(ctx, wg)
 
+	done := make(chan bool)
+	system.SpawnSignalHandler(done, logger, syscall.SIGINT, syscall.SIGKILL)
+
+	<-done
+	cancelCtx()
 	wg.Wait()
+	logger.Info("sg-core exited cleanly")
 }

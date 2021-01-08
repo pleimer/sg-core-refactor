@@ -131,14 +131,16 @@ func (pc *PromCollector) SetDescs(name string, description string, labels map[st
 }
 
 //UpdateMetrics update metrics in collector
-func (pc *PromCollector) UpdateMetrics(metric data.Metric, ep *expiryProc) {
+func (pc *PromCollector) UpdateMetrics(metric data.Metric, ep *expiryProc, expiryInterval float64) {
 	if !pc.expirys.Contains(metric.Name) { //register new metrics in expiry
 		exp := metricExpiry{
-			interval: 20,
+			interval: expiryInterval,
 			delete: func() {
 				pc.metrics.Delete(metric.Name)
 				pc.descriptions.Delete(metric.Name)
 				pc.expirys.Delete(metric.Name)
+				pc.logger.Metadata(logging.Metadata{"plugin": "prometheus"})
+				pc.logger.Info(fmt.Sprintf("metric '%s' deleted after %.1fs of stale time", metric.Name, expiryInterval))
 			},
 		}
 		pc.expirys.Set(metric.Name, &exp)
@@ -196,14 +198,22 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 	//run exporter for prometheus to scrape
 	wg.Add(1)
 	go func(wg *sync.WaitGroup) {
-		defer wg.Done()
 		metricsURL := fmt.Sprintf("%s:%d", p.configuration.Host, p.configuration.Port)
 		p.logger.Info(fmt.Sprintf("Metric server at : %s", metricsURL))
 
-		err := http.ListenAndServe(metricsURL, handler)
-		if err != nil {
+		srv := &http.Server{Addr: metricsURL}
+		srv.Handler = handler
+
+		go func() {
+			defer wg.Done()
+			if err := srv.ListenAndServe(); err != http.ErrServerClosed {
+				p.logger.Metadata(logging.Metadata{"error": err})
+				p.logger.Error("Metric scrape endpoint failed")
+			}
+		}()
+		if err := srv.Shutdown(ctx); err != nil {
 			p.logger.Metadata(logging.Metadata{"error": err})
-			p.logger.Error("Metric server failed")
+			p.logger.Error("Error while shutting down metrics endpoint")
 		}
 	}(wg)
 
@@ -232,11 +242,12 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 					p.logger.Error("Error setting prometheus collector descriptions")
 					continue
 				}
-				p.collectors.Get(labelLenStr).(*PromCollector).UpdateMetrics(m, p.expiry)
+				p.collectors.Get(labelLenStr).(*PromCollector).UpdateMetrics(m, p.expiry, float64(p.configuration.MetricTimeout))
 			}
 		}
 	}
 done:
+	p.logger.Info("Prometheus plugin exited")
 }
 
 //Config implements application.Application

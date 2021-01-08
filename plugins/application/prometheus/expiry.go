@@ -52,11 +52,9 @@ func (ep *expiryProc) run(ctx context.Context) {
 		select {
 		case <-ctx.Done():
 			goto done
-		default:
+		case <-time.After(time.Millisecond * ep.interval):
 			ep.check()
-			time.Sleep(time.Millisecond * ep.interval)
 		}
 	}
 done:
-	return
 }

@@ -14,6 +14,8 @@ const maxBufferSize = 4096
 
 var msgBuffer []byte
 
+var sent bool
+
 func init() {
 	msgBuffer = make([]byte, maxBufferSize)
 }
@@ -32,28 +34,9 @@ type metric struct {
 }
 
 func generateMetric() []metric {
-	return []metric{{
-		Values: []float64{
-			rand.Float64() * 1000,
-			rand.Float64() * 10000,
-		},
-		Dstypes: []string{
-			"derive",
-			"counter",
-		},
-		Dsnames: []string{
-			"rx",
-			"tx",
-		},
-		Host:           "controller-0.redhat.local",
-		Time:           time.Now().Unix(),
-		Interval:       5,
-		Plugin:         "virt",
-		PluginInstance: "asdf",
-		Type:           "if_packets",
-		TypeInstance:   "tap73125d-60",
-	},
-		{
+	if !sent {
+		//sent = true
+		return []metric{{
 			Values: []float64{
 				rand.Float64() * 1000,
 				rand.Float64() * 10000,
@@ -63,8 +46,8 @@ func generateMetric() []metric {
 				"counter",
 			},
 			Dsnames: []string{
-				"in",
-				"out",
+				"rx",
+				"tx",
 			},
 			Host:           "controller-0.redhat.local",
 			Time:           time.Now().Unix(),
@@ -74,7 +57,30 @@ func generateMetric() []metric {
 			Type:           "if_packets",
 			TypeInstance:   "tap73125d-60",
 		},
+			{
+				Values: []float64{
+					rand.Float64() * 1000,
+					rand.Float64() * 10000,
+				},
+				Dstypes: []string{
+					"derive",
+					"counter",
+				},
+				Dsnames: []string{
+					"in",
+					"out",
+				},
+				Host:           "controller-0.redhat.local",
+				Time:           time.Now().Unix(),
+				Interval:       5,
+				Plugin:         "virt",
+				PluginInstance: "asdf",
+				Type:           "if_packets",
+				TypeInstance:   "tap73125d-60",
+			},
+		}
 	}
+	return []metric{}
 }
 
 //Dummy basic struct
@@ -89,7 +95,7 @@ func (s *Dummy) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn
 		select {
 		case <-ctx.Done():
 			goto done
-		default:
+		case <-time.After(time.Second * 1):
 			time.Sleep(time.Second * 1)
 			r, err := json.Marshal(generateMetric())
 			if err != nil {
