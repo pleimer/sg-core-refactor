@@ -19,7 +19,7 @@ import (
 
 type configT struct {
 	Host          string
-	Port          int
+	Port          int `validate:"required"`
 	MetricTimeout int
 }
 
@@ -174,7 +174,7 @@ func New(l *logging.Logger) application.Application {
 }
 
 //Run run scrape endpoint
-func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan data.Event, mChan chan []data.Metric) {
+func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan data.Event, mChan chan []data.Metric, done chan bool) {
 	defer wg.Done()
 	registry := prometheus.NewRegistry()
 
@@ -208,6 +208,7 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 		if err := srv.ListenAndServe(); err != http.ErrServerClosed {
 			p.logger.Metadata(logging.Metadata{"error": err})
 			p.logger.Error("Metric scrape endpoint failed")
+			done <- true
 		}
 	}()
 
@@ -217,12 +218,6 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 	for {
 		select {
 		case <-ctx.Done():
-			timeout, cancel := context.WithTimeout(context.Background(), time.Second*5)
-			defer cancel()
-			if err := srv.Shutdown(timeout); err != nil {
-				p.logger.Metadata(logging.Metadata{"error": err})
-				p.logger.Error("Error while shutting down metrics endpoint")
-			}
 			goto done
 		case <-eChan:
 			p.logger.Warn("Prometheus plugin received an event - disregarding")
@@ -247,11 +242,19 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 		}
 	}
 done:
-	p.logger.Info("Prometheus plugin exited")
+	timeout, cancel := context.WithTimeout(context.Background(), time.Second*5)
+	defer cancel()
+	if err := srv.Shutdown(timeout); err != nil {
+		p.logger.Metadata(logging.Metadata{"error": err})
+		p.logger.Error("Error while shutting down metrics endpoint")
+	}
+	p.logger.Metadata(logging.Metadata{"plugin": "prometheus"})
+	p.logger.Info("exited")
 }
 
 //Config implements application.Application
 func (p *Prometheus) Config(c []byte) error {
+	p.configuration = configT{}
 	err := config.ParseConfig(bytes.NewReader(c), &p.configuration)
 	if err != nil {
 		return err

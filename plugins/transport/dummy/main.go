@@ -90,7 +90,7 @@ type Dummy struct {
 }
 
 //Run implements type Transport
-func (s *Dummy) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn) {
+func (s *Dummy) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn, done chan bool) {
 	defer wg.Done()
 
 	for {

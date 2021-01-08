@@ -32,7 +32,7 @@ func ParseConfig(r io.Reader, config interface{}) error {
 			for _, fe := range e {
 				missingFields = append(missingFields, setCamelCase(fe.Namespace()))
 			}
-			return fmt.Errorf("missing fields in config - << %s >>", strings.Join(missingFields, " , "))
+			return fmt.Errorf("missing or incorrect configuration field -> %s", strings.Join(missingFields, " , "))
 		}
 		return errors.Wrap(err, "error while validating configuration")
 	}
@@ -48,5 +48,5 @@ func setCamelCase(field string) string {
 		camel[0] = l[0]
 		ret = append(ret, string(camel))
 	}
-	return strings.Join(ret, ".")
+	return strings.Join(ret[1:], ".")
 }

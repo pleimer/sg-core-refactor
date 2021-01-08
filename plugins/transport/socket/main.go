@@ -27,7 +27,7 @@ type Socket struct {
 }
 
 //Run implements type Transport
-func (s *Socket) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn) {
+func (s *Socket) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn, done chan bool) {
 	defer wg.Done()
 
 	msgBuffer := make([]byte, maxBufferSize)
@@ -44,26 +44,24 @@ func (s *Socket) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteF
 		s.logger.Error("failed to listen on unix soc")
 		return
 	}
-	defer os.Remove(s.conf.Address)
-	defer pc.Close()
 
+	s.logger.Metadata(logging.Metadata{"plugin": "socket"})
+	s.logger.Info(fmt.Sprintf("socket listening on %s", laddr.Name))
 	go func() {
-		for {
-			n, err := pc.Read(msgBuffer)
+		n, err := pc.Read(msgBuffer)
 
-			if err != nil {
-				s.logger.Metadata(logging.Metadata{"plugin": "socket", "error": err})
-				s.logger.Error("failed reading data")
-				return //done
-			}
-			if n < 1 {
-				return
-			}
-			w(msgBuffer[:n])
+		if err != nil || n < 1 {
+			done <- true
+			return
 		}
+		w(msgBuffer[:n])
 	}()
 
 	<-ctx.Done()
+	pc.Close()
+	os.Remove(s.conf.Address)
+	s.logger.Metadata(logging.Metadata{"plugin": "socket"})
+	s.logger.Info("exited")
 }
 
 //Listen ...

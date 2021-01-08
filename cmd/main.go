@@ -60,13 +60,13 @@ func main() {
 		err = manager.InitTransport(tConfig.Name, tConfig.Config)
 		if err != nil {
 			logger.Metadata(log.Metadata{"transport": tConfig.Name, "error": err})
-			logger.Warn("failed configuring transport")
+			logger.Error("failed configuring transport")
 			continue
 		}
 		err = manager.SetTransportHandlers(tConfig.Name, tConfig.Handlers)
 		if err != nil {
 			logger.Metadata(log.Metadata{"transport": tConfig.Name, "error": err})
-			logger.Warn("transport handlers failed to load")
+			logger.Error("transport handlers failed to load")
 			continue
 		}
 		logger.Metadata(log.Metadata{"transport": tConfig.Name})
@@ -77,23 +77,37 @@ func main() {
 		err = manager.InitApplication(aConfig.Name, aConfig.Config)
 		if err != nil {
 			logger.Metadata(log.Metadata{"application": aConfig.Name, "error": err})
-			logger.Warn("failed configuring application")
+			logger.Error("failed configuring application")
 			continue
 		}
 		logger.Metadata(log.Metadata{"application": aConfig.Name})
 		logger.Info("loaded application plugin")
 	}
 
+	if err != nil {
+		return
+	}
+
 	ctx, cancelCtx := context.WithCancel(context.Background())
 	wg := new(sync.WaitGroup)
 	//run main processes
-	manager.RunTransports(ctx, wg)
-	manager.RunApplications(ctx, wg)
 
-	done := make(chan bool)
-	system.SpawnSignalHandler(done, logger, syscall.SIGINT, syscall.SIGKILL)
+	pluginDone := make(chan bool) //notified if a plugin stops execution before main or interrupt recieved
+	interrupt := make(chan bool)
+	manager.RunTransports(ctx, wg, pluginDone)
+	manager.RunApplications(ctx, wg, pluginDone)
+	system.SpawnSignalHandler(interrupt, logger, syscall.SIGINT, syscall.SIGKILL)
 
-	<-done
+	for {
+		select {
+		case <-pluginDone:
+			goto done
+		case <-interrupt:
+			goto done
+		}
+	}
+
+done:
 	cancelCtx()
 	wg.Wait()
 	logger.Info("sg-core exited cleanly")

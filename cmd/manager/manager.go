@@ -81,10 +81,6 @@ func InitTransport(name string, config interface{}) error {
 
 	transports[name] = new(logger)
 
-	if config == nil {
-		return nil
-	}
-
 	c, err := yaml.Marshal(config)
 	if err != nil {
 		return errors.Wrapf(err, "failed parsing transport config for '%s'", name)
@@ -110,10 +106,6 @@ func InitApplication(name string, config interface{}) error {
 	}
 
 	applications[name] = new(logger)
-
-	if config == nil {
-		return nil
-	}
 
 	c, err := yaml.Marshal(config)
 	if err != nil {
@@ -153,7 +145,7 @@ func SetTransportHandlers(name string, handlerNames []string) error {
 }
 
 //RunTransports spins off tranpsort + handler processes
-func RunTransports(ctx context.Context, wg *sync.WaitGroup) {
+func RunTransports(ctx context.Context, wg *sync.WaitGroup, done chan bool) {
 	for name, t := range transports {
 		wg.Add(1)
 		go t.Run(ctx, wg, func(blob []byte) {
@@ -175,12 +167,12 @@ func RunTransports(ctx context.Context, wg *sync.WaitGroup) {
 				}
 				eventBus.Publish(res)
 			}
-		})
+		}, done)
 	}
 }
 
 //RunApplications spins off application processes
-func RunApplications(ctx context.Context, wg *sync.WaitGroup) {
+func RunApplications(ctx context.Context, wg *sync.WaitGroup, done chan bool) {
 	for _, a := range applications {
 		eChan := make(chan data.Event)
 		mChan := make(chan []data.Metric)
@@ -188,7 +180,7 @@ func RunApplications(ctx context.Context, wg *sync.WaitGroup) {
 		eventBus.Subscribe(eChan)
 		metricBus.Subscribe(mChan)
 		wg.Add(1)
-		go a.Run(ctx, wg, eChan, mChan)
+		go a.Run(ctx, wg, eChan, mChan, done)
 	}
 }
 

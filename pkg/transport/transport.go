@@ -41,6 +41,6 @@ type WriteFn func([]byte)
 //TODO: give transports a writer to send logs to
 type Transport interface {
 	Config([]byte) error
-	Run(context.Context, *sync.WaitGroup, WriteFn)
+	Run(context.Context, *sync.WaitGroup, WriteFn, chan bool)
 	Listen(data.Event)
 }
