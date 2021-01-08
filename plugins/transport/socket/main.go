@@ -48,13 +48,16 @@ func (s *Socket) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteF
 	s.logger.Metadata(logging.Metadata{"plugin": "socket"})
 	s.logger.Info(fmt.Sprintf("socket listening on %s", laddr.Name))
 	go func() {
-		n, err := pc.Read(msgBuffer)
+		for {
+			n, err := pc.Read(msgBuffer)
+			//fmt.Printf("received message: %s\n", string(msgBuffer))
 
-		if err != nil || n < 1 {
-			done <- true
-			return
+			if err != nil || n < 1 {
+				done <- true
+				return
+			}
+			w(msgBuffer[:n])
 		}
-		w(msgBuffer[:n])
 	}()
 
 	<-ctx.Done()

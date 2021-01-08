@@ -225,7 +225,6 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 			// update descriptions
 			for _, m := range metrics {
 				labelLenStr := fmt.Sprintf("%d", len(m.Labels))
-				p.logger.Debug(fmt.Sprintf("Prometheus received metric: %v\n", m))
 				if !p.collectors.Contains(labelLenStr) {
 					c := NewPromCollector(p.logger)
 					p.collectors.Set(string(labelLenStr), c)
