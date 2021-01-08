@@ -217,7 +217,9 @@ func (p *Prometheus) Run(ctx context.Context, wg *sync.WaitGroup, eChan chan dat
 	for {
 		select {
 		case <-ctx.Done():
-			if err := srv.Shutdown(ctx); err != nil {
+			timeout, cancel := context.WithTimeout(context.Background(), time.Second*5)
+			defer cancel()
+			if err := srv.Shutdown(timeout); err != nil {
 				p.logger.Metadata(logging.Metadata{"error": err})
 				p.logger.Error("Error while shutting down metrics endpoint")
 			}
