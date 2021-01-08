@@ -7,6 +7,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/infrawatch/apputils/logging"
+	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
 )
 
@@ -108,12 +110,17 @@ func (s *Dummy) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn
 done:
 }
 
+//Listen ...
+func (s *Dummy) Listen(e data.Event) {
+
+}
+
 //Config load configurations
 func (s *Dummy) Config(c []byte) error {
 	return nil
 }
 
 //New create new socket transport
-func New() transport.Transport {
+func New(l *logging.Logger) transport.Transport {
 	return &Dummy{}
 }

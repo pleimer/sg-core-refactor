@@ -9,7 +9,6 @@ type configT struct {
 	LogLevel   string `validate:"oneof=error warn info debug"`
 	Transports []struct {
 		Name     string `validate:"required"`
-		Mode     string `validate:"required"`
 		Handlers []string
 		Config   interface{}
 	} `validate:"dive"`

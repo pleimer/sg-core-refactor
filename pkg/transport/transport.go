@@ -4,6 +4,8 @@ import (
 	"context"
 	"strings"
 	"sync"
+
+	"github.com/infrawatch/sg-core-refactor/pkg/data"
 )
 
 // package transport defines the interfaces for interacting with transport
@@ -40,4 +42,5 @@ type WriteFn func([]byte)
 type Transport interface {
 	Config([]byte) error
 	Run(context.Context, *sync.WaitGroup, WriteFn)
+	Listen(data.Event)
 }

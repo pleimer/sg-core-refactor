@@ -57,7 +57,7 @@ func main() {
 	manager.SetPluginDir(configuration.PluginDir)
 
 	for _, tConfig := range configuration.Transports {
-		err = manager.InitTransport(tConfig.Name, tConfig.Mode, tConfig.Config)
+		err = manager.InitTransport(tConfig.Name, tConfig.Config)
 		if err != nil {
 			logger.Metadata(log.Metadata{"transport": tConfig.Name, "error": err})
 			logger.Warn("failed configuring transport")

@@ -68,18 +68,18 @@ func SetLogger(l *logging.Logger) {
 }
 
 //InitTransport load tranpsort binary and initialize with config
-func InitTransport(name string, mode string, config interface{}) error {
+func InitTransport(name string, config interface{}) error {
 	n, err := initPlugin(name)
 	if err != nil {
 		return errors.Wrap(err, "failed initializing transport")
 	}
 
-	new, ok := n.(func() transport.Transport)
+	new, ok := n.(func(*logging.Logger) transport.Transport)
 	if !ok {
 		return fmt.Errorf("plugin %s constructor 'New' did not return type 'transport.Transport'", name)
 	}
 
-	transports[name] = new()
+	transports[name] = new(logger)
 
 	if config == nil {
 		return nil

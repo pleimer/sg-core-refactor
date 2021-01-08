@@ -3,19 +3,18 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
+	"net"
+	"os"
 	"sync"
 
+	"github.com/infrawatch/apputils/logging"
 	"github.com/infrawatch/sg-core-refactor/pkg/config"
+	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/infrawatch/sg-core-refactor/pkg/transport"
 )
 
 const maxBufferSize = 4096
-
-var msgBuffer []byte
-
-func init() {
-	msgBuffer = make([]byte, maxBufferSize)
-}
 
 type configT struct {
 	Address string `validate:"required"`
@@ -23,47 +22,53 @@ type configT struct {
 
 //Socket basic struct
 type Socket struct {
-	conf configT
+	conf   configT
+	logger *logging.Logger
 }
 
 //Run implements type Transport
 func (s *Socket) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn) {
 	defer wg.Done()
 
-	// var laddr net.UnixAddr
+	msgBuffer := make([]byte, maxBufferSize)
+	var laddr net.UnixAddr
 
-	// laddr.Name = s.conf.Address
-	// laddr.Net = "unixgram"
+	laddr.Name = s.conf.Address
+	laddr.Net = "unixgram"
 
-	// os.Remove(s.conf.Address)
+	os.Remove(s.conf.Address)
 
-	// pc, err := net.ListenUnixgram("unixgram", &laddr)
-	// if err != nil {
-	// 	return err
-	// }
-	// defer os.Remove(s.conf.Address)
-	// defer pc.Close()
-
-	// for {
-	// 	n, err := pc.Read(msgBuffer[:])
-	// 	if err != nil {
-	// 		return err
-	// 	}
-	// 	if n < 1 {
-	// 		return nil
-	// 	}
-	// 	t <- msgBuffer
-	// }
-
-	for {
-		select {
-		case <-ctx.Done():
-			goto done
-		default:
-		}
+	pc, err := net.ListenUnixgram("unixgram", &laddr)
+	if err != nil {
+		s.logger.Metadata(logging.Metadata{"plugin": "socket", "error": err})
+		s.logger.Error("failed to listen on unix soc")
+		return
 	}
+	defer os.Remove(s.conf.Address)
+	defer pc.Close()
 
-done:
+	go func() {
+		for {
+			n, err := pc.Read(msgBuffer)
+
+			if err != nil {
+				s.logger.Metadata(logging.Metadata{"plugin": "socket", "error": err})
+				s.logger.Error("failed reading data")
+				return //done
+			}
+			if n < 1 {
+				return
+			}
+			w(msgBuffer[:n])
+		}
+	}()
+
+	<-ctx.Done()
+}
+
+//Listen ...
+func (s *Socket) Listen(e data.Event) {
+	fmt.Printf("Recieved event: %v\n", e)
 }
 
 //Config load configurations
@@ -77,6 +82,8 @@ func (s *Socket) Config(c []byte) error {
 }
 
 //New create new socket transport
-func New() transport.Transport {
-	return &Socket{}
+func New(l *logging.Logger) transport.Transport {
+	return &Socket{
+		logger: l,
+	}
 }
