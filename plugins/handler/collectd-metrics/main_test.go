@@ -99,3 +99,12 @@ func TestMsgParsing(t *testing.T) {
 		}
 	})
 }
+
+func BenchmarkParsing(b *testing.B) {
+	// GOMAXPROCS = 8
+	// On thinkpad T480s, performs at ~ 195k m/s
+	metricHandler := New().(*collectdMetricsHandler)
+	for i := 0; i < b.N; i++ {
+		metricHandler.Handle([]byte(testMsgsValid["Multi-dimensional Metrics"]))
+	}
+}
