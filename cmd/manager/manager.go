@@ -150,13 +150,10 @@ func RunTransports(ctx context.Context, wg *sync.WaitGroup, done chan bool) {
 		wg.Add(1)
 		go t.Run(ctx, wg, func(blob []byte) {
 			for _, handler := range metricHandlers[name] {
-				res, err := handler.Handle(blob)
-				if err != nil {
-					logger.Metadata(logging.Metadata{"error": err})
-					logger.Error("failed handling message")
-					continue
+				res := handler.Handle(blob)
+				if res != nil {
+					metricBus.Publish(res)
 				}
-				metricBus.Publish(res)
 			}
 			for _, handler := range eventHandlers[name] {
 				res, err := handler.Handle(blob)

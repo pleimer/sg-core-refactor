@@ -11,30 +11,36 @@ import (
 
 type collectdMetricsHandler struct {
 	totalMetricsReceived uint64
+	totalDecodeErrors    uint64
 }
 
-func (c *collectdMetricsHandler) Handle(blob []byte) ([]data.Metric, error) {
+func (c *collectdMetricsHandler) Handle(blob []byte) []data.Metric {
 
-	cdmetrics, err := collectd.ParseInputByte(blob)
+	var err error
+	var cdmetrics *[]collectd.Metric
+
+	cdmetrics, err = collectd.ParseInputByte(blob)
 	if err != nil {
-		return nil, err
+		c.totalDecodeErrors++
+		return nil
 	}
 
 	var ms []data.Metric
 	metrics := []data.Metric{}
-	for index, cdmetric := range *cdmetrics {
-		ms, err = c.createMetrics(&cdmetric, index)
+	for _, cdmetric := range *cdmetrics {
+		ms, err = c.createMetrics(&cdmetric)
 		if err != nil {
-			return nil, err
+			c.totalDecodeErrors++
+			continue
 		}
 
 		metrics = append(metrics, ms...)
 	}
 
-	return metrics, nil
+	return metrics
 }
 
-func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric, index int) ([]data.Metric, error) {
+func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric) ([]data.Metric, error) {
 	if cdmetric.Host == "" {
 		return nil, fmt.Errorf("missing host: %v ", cdmetric)
 	}
@@ -50,12 +56,13 @@ func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric, index 
 
 	var mt data.MetricType
 	var err error
-	if mt, err = mt.FromString(cdmetric.Dstypes[index]); err != nil {
-		return nil, err
-	}
 
 	var metrics []data.Metric
 	for index := range cdmetric.Dsnames {
+		if mt, err = mt.FromString(cdmetric.Dstypes[index]); err != nil {
+			return nil, err
+		}
+
 		metrics = append(metrics,
 			data.Metric{
 				Name:  genMetricName(cdmetric, index),
@@ -68,7 +75,7 @@ func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric, index 
 					"type_instance":   cdmetric.TypeInstance,
 				}})
 	}
-	metrics = append(metrics, data.Metric{
+	metrics = append(metrics, []data.Metric{{
 		Name:  "sg_total_metric_rcv_count",
 		Type:  data.COUNTER,
 		Value: float64(c.totalMetricsReceived),
@@ -76,7 +83,16 @@ func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric, index 
 		Labels: map[string]string{
 			"source": "SG",
 		},
-	})
+	}, {
+		Name:  "sg_total_metric_decode_error_count",
+		Type:  data.COUNTER,
+		Value: float64(c.totalDecodeErrors),
+		Time:  time.Now(),
+		Labels: map[string]string{
+			"source": "SG",
+		},
+	},
+	}...)
 	c.totalMetricsReceived++
 	return metrics, nil
 }
