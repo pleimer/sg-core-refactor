@@ -1,16 +1,16 @@
 package main
 
 import (
-	"fmt"
 	"time"
 
+	"github.com/go-openapi/errors"
 	"github.com/infrawatch/sg-core-refactor/pkg/data"
 	"github.com/infrawatch/sg-core-refactor/pkg/handler"
 	"github.com/infrawatch/sg-core-refactor/plugins/handler/collectd-metrics/pkg/collectd"
 )
 
 type collectdMetricsHandler struct {
-	totalMetricsReceived uint64
+	totalMetricsReceived uint64 //total number of internal metrics created from collectd blobs
 	totalDecodeErrors    uint64
 }
 
@@ -20,61 +20,27 @@ func (c *collectdMetricsHandler) Handle(blob []byte) []data.Metric {
 	var cdmetrics *[]collectd.Metric
 
 	cdmetrics, err = collectd.ParseInputByte(blob)
+	metrics := []data.Metric{}
+
 	if err != nil {
 		c.totalDecodeErrors++
-		return nil
+		return metrics
 	}
 
 	var ms []data.Metric
-	metrics := []data.Metric{}
+	if cdmetrics == nil {
+		c.totalDecodeErrors++
+		return metrics
+	}
+
 	for _, cdmetric := range *cdmetrics {
 		ms, err = c.createMetrics(&cdmetric)
 		if err != nil {
 			c.totalDecodeErrors++
-			continue
 		}
-
 		metrics = append(metrics, ms...)
 	}
 
-	return metrics
-}
-
-func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric) ([]data.Metric, error) {
-	if cdmetric.Host == "" {
-		return nil, fmt.Errorf("missing host: %v ", cdmetric)
-	}
-
-	pluginInstance := cdmetric.PluginInstance
-	if pluginInstance == "" {
-		pluginInstance = "base"
-	}
-	typeInstance := cdmetric.TypeInstance
-	if typeInstance == "" {
-		typeInstance = "base"
-	}
-
-	var mt data.MetricType
-	var err error
-
-	var metrics []data.Metric
-	for index := range cdmetric.Dsnames {
-		if mt, err = mt.FromString(cdmetric.Dstypes[index]); err != nil {
-			return nil, err
-		}
-
-		metrics = append(metrics,
-			data.Metric{
-				Name:  genMetricName(cdmetric, index),
-				Type:  mt,
-				Value: cdmetric.Values[index],
-				Time:  cdmetric.Time.Time(),
-				Labels: map[string]string{
-					"host":            cdmetric.Host,
-					"plugin_instance": cdmetric.PluginInstance,
-					"type_instance":   cdmetric.TypeInstance,
-				}})
-	}
 	metrics = append(metrics, []data.Metric{{
 		Name:  "sg_total_metric_rcv_count",
 		Type:  data.COUNTER,
@@ -93,8 +59,68 @@ func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric) ([]dat
 		},
 	},
 	}...)
-	c.totalMetricsReceived++
+
+	return metrics
+}
+
+func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric) ([]data.Metric, error) {
+	if !validateMetric(cdmetric) {
+		return nil, errors.New(0, "")
+	}
+	pluginInstance := cdmetric.PluginInstance
+	if pluginInstance == "" {
+		pluginInstance = "base"
+	}
+	typeInstance := cdmetric.TypeInstance
+	if typeInstance == "" {
+		typeInstance = "base"
+	}
+
+	var mt data.MetricType
+	var err error
+
+	equal := int64((len(cdmetric.Dsnames) ^ len(cdmetric.Dstypes)) ^ (len(cdmetric.Dsnames) ^ len(cdmetric.Values)))
+	if equal != 0 {
+		return nil, errors.New(0, "")
+	}
+
+	var metrics []data.Metric
+	for index := range cdmetric.Dsnames {
+		if mt, err = mt.FromString(cdmetric.Dstypes[index]); err != nil {
+			return nil, err
+		}
+
+		metrics = append(metrics,
+			data.Metric{
+				Name:  genMetricName(cdmetric, index),
+				Type:  mt,
+				Value: cdmetric.Values[index],
+				Time:  cdmetric.Time.Time(),
+				Labels: map[string]string{
+					"host":            cdmetric.Host,
+					"plugin_instance": pluginInstance,
+					"type_instance":   typeInstance,
+				}})
+		c.totalMetricsReceived++
+	}
 	return metrics, nil
+}
+
+func validateMetric(cdmetric *collectd.Metric) bool {
+	if cdmetric.Dsnames == nil ||
+		cdmetric.Dstypes == nil ||
+		cdmetric.Values == nil ||
+		cdmetric.Host == "" ||
+		cdmetric.Plugin == "" ||
+		cdmetric.Type == "" {
+		return false
+	}
+
+	equal := int64((len(cdmetric.Dsnames) ^ len(cdmetric.Dstypes)) ^ (len(cdmetric.Dsnames) ^ len(cdmetric.Values)))
+	if equal != 0 {
+		return false
+	}
+	return true
 }
 
 func genMetricName(cdmetric *collectd.Metric, index int) (name string) {
