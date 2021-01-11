@@ -9,16 +9,16 @@ import (
 )
 
 var testMsgsInvalid map[string]string = map[string]string{
-	"Null":                 ``,
-	"Non-list":             `{}`,
-	"Empty":                `[{}]`,
-	"Missing Dstypes":      `[{"values": [2121], "dsnames":["samples"], "host":"localhost","plugin":"metric","type":"type0"}]`,
-	"Missing Dsnames":      `[{"values": [2121], "dstypes": ["derive"], "host":"localhost","plugin":"metric","type":"type0"}]`,
-	"Missing Values":       `[{"values": [2121], "dstypes": ["derive"], "host":"localhost","plugin":"metric","type":"type0"}]`,
-	"Missing Host":         `[{"values": [2121], "dstypes": ["derive"], "dsnames":["samples"],"plugin":"metric","type":"type0"}]`,
-	"Missing Plugin":       `[{"values": [2121], "dstypes": ["derive"], "dsnames":["samples"], "host":"localhost","type":"type0"}]`,
-	"Missing Type":         `[{"values": [2121], "dstypes": ["derive"], "dsnames":["samples"], "host":"localhost","plugin":"metric"}]`,
-	"Inconsistent Metrics": `[{"values": [2121], "dstypes": ["derive","counter"], "dsnames":["samples"], "host":"localhost","plugin":"metric","type":"type0"}]`,
+	"Null":                    ``,
+	"Non-list":                `{}`,
+	"Empty":                   `[{}]`,
+	"Missing Dstypes":         `[{"values": [2121], "dsnames":["samples"], "host":"localhost","plugin":"metric","type":"type0"}]`,
+	"Missing Dsnames":         `[{"values": [2121], "dstypes": ["derive"], "host":"localhost","plugin":"metric","type":"type0"}]`,
+	"Missing Values":          `[{"values": [2121], "dstypes": ["derive"], "host":"localhost","plugin":"metric","type":"type0"}]`,
+	"Missing Host":            `[{"values": [2121], "dstypes": ["derive"], "dsnames":["samples"],"plugin":"metric","type":"type0"}]`,
+	"Missing Plugin":          `[{"values": [2121], "dstypes": ["derive"], "dsnames":["samples"], "host":"localhost","type":"type0"}]`,
+	"Missing Type":            `[{"values": [2121], "dstypes": ["derive"], "dsnames":["samples"], "host":"localhost","plugin":"metric"}]`,
+	"Inconsistent Dimensions": `[{"values": [2121], "dstypes": ["derive","counter"], "dsnames":["samples"], "host":"localhost","plugin":"metric","type":"type0"}]`,
 }
 
 var testMsgsValid map[string]string = map[string]string{
