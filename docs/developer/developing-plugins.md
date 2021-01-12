@@ -12,7 +12,7 @@ created if there exists more than one configuration for that plugin.
 Sg-core begins by loading plugin shared object files (those that have been configures) and calling the New() function. The New() function is different for each type:
 
 Plugin Type | Initializer Function
-- | -
+-|-
 Transport | `func New(* logging.Logger) transport.Transport`
 Handler | `func New() handler.MetricHandler` or `func New() handler.EventHandler`
 Application | `func New(* logging.Logger) application.Application`
@@ -24,7 +24,7 @@ Both transport and application plugins contain a Run() function which contain th
 Implementations of the Run() function ___must___ begin by deferring the waitgroup Done() method, otherwise the sg-core will indefinitely hang when attempting exit.
 
 ```go
-func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w WriteFn, done chan bool) transport.Transport {
+func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn, done chan bool) transport.Transport {
     defer wg.Done()
 
     [...]
@@ -37,7 +37,7 @@ func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w WriteFn, done chan 
 A plugin's Run() function should also listen for close signals on the context and exit when it is received. Additionally, if a critical error occurs, the plugin should pass `true` to the last function argument. This will signal the sg-core to perform a clean exit.
 
 ```go
-func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w WriteFn, done chan bool) transport.Transport {
+func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn, done chan bool) transport.Transport {
     defer wg.Done()
 
     go func() {
@@ -107,7 +107,7 @@ Transport plugin objects must implement the the Transport interface:
 ```go
 type Transport interface {
 	Config([]byte) error
-	Run(context.Context, *sync.WaitGroup, WriteFn, chan bool)
+	Run(context.Context, *sync.WaitGroup, transport.WriteFn, chan bool)
 	Listen(data.Event)
 }
 ```
@@ -143,3 +143,4 @@ type Application interface {
 ```
 
 ## Examples
+Examples of the implementation of each type of plugin can be found in the [plugins](https://github.com/pleimer/sg-core-refactor/tree/master/plugins) directory.
