@@ -266,7 +266,6 @@ func (p *Prometheus) Config(c []byte) error {
 func metricTypeToPromValueType(mType data.MetricType) prometheus.ValueType {
 	return map[data.MetricType]prometheus.ValueType{
 		data.COUNTER: prometheus.CounterValue,
-		data.DERIVE:  prometheus.CounterValue,
 		data.GAUGE:   prometheus.GaugeValue,
 		data.UNTYPED: prometheus.UntypedValue,
 	}[mType]

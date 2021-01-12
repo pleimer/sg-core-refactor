@@ -31,7 +31,7 @@ var validResults map[string][]data.Metric = map[string][]data.Metric{
 	"Without Instance Types": {{
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",
@@ -41,7 +41,7 @@ var validResults map[string][]data.Metric = map[string][]data.Metric{
 	"With Instance Types": {{
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "plugin0",
@@ -51,7 +51,7 @@ var validResults map[string][]data.Metric = map[string][]data.Metric{
 	"Multi-dimensional Metrics": {{
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",
@@ -60,7 +60,7 @@ var validResults map[string][]data.Metric = map[string][]data.Metric{
 	}, {
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",

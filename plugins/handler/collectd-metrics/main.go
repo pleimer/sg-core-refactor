@@ -76,9 +76,6 @@ func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric) ([]dat
 		typeInstance = "base"
 	}
 
-	var mt data.MetricType
-	var err error
-
 	equal := int64((len(cdmetric.Dsnames) ^ len(cdmetric.Dstypes)) ^ (len(cdmetric.Dsnames) ^ len(cdmetric.Values)))
 	if equal != 0 {
 		return nil, errors.New(0, "")
@@ -86,14 +83,10 @@ func (c *collectdMetricsHandler) createMetrics(cdmetric *collectd.Metric) ([]dat
 
 	var metrics []data.Metric
 	for index := range cdmetric.Dsnames {
-		if mt, err = mt.FromString(cdmetric.Dstypes[index]); err != nil {
-			return nil, err
-		}
-
 		metrics = append(metrics,
 			data.Metric{
 				Name:  genMetricName(cdmetric, index),
-				Type:  mt,
+				Type:  strToMetricType(cdmetric.Dstypes[index]),
 				Value: cdmetric.Values[index],
 				Time:  cdmetric.Time.Time(),
 				Labels: map[string]string{
@@ -140,6 +133,18 @@ func genMetricName(cdmetric *collectd.Metric, index int) (name string) {
 	}
 
 	return
+}
+
+func strToMetricType(msg string) data.MetricType {
+	if mt, ok := map[string]data.MetricType{
+		"counter":  data.COUNTER,
+		"absolute": data.UNTYPED,
+		"derive":   data.COUNTER,
+		"gauge":    data.GAUGE,
+	}[msg]; ok {
+		return mt
+	}
+	return data.UNTYPED
 }
 
 //New create new collectdMetricsHandler object
