@@ -11,7 +11,8 @@ Default plugins exist in /plugins. Plugins can also be hosted as separate projec
 ## Example Configuration
 This configuration assumes both a Quipid Dispatch Router and Prometheus instance
 are running on the localhost and listens for incoming messages on a unix socket
-at `/tmp/smartgateway`.
+at `/tmp/smartgateway`. The setup expects incoming messages to be collectd
+metrics, as can be seen by the type of handler bound to the socket transport.
 
 ```yaml
 plugindir: bin/
