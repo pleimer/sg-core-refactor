@@ -1,29 +1,145 @@
-# Plugin types
+# Plugins
 
 1. Transport
 2. Handler
 3. Application
 
-# Philosophy
+## Philosophy
 Plugins should be objects with a constructor such that more than one can be 
 created if there exists more than one configuration for that plugin.
 
-# Interface Heiarrchy 
+# Development
+Sg-core begins by loading plugin shared object files (those that have been configures) and calling the New() function. The New() function is different for each type:
 
-# Plugin configurations
-Plugins should not read their own cofiguration files. The sg-core provides
-all methods for reading configurations using the golang 
-[yaml.v3](https://pkg.go.dev/gopkg.in/yaml.v3). However, validation must be 
-implemented by the plugin.
+Plugin Type | Initializer Function
+- | -
+Transport | `func New(* logging.Logger) transport.Transport`
+Handler | `func New() handler.MetricHandler` or `func New() handler.EventHandler`
+Application | `func New(* logging.Logger) application.Application`
 
-Sg-core looks within it's own configuration for plugin configurations, matching 
-`name` field with the name of the shared object file. `config` field is then
-passed to the plugin's `Config()` function. Each plugin is
-responsible for validating the passed in configuration and should return an
-error in the case that it fails.
+Both transport and application plugins contain a Run() function which contain their primary process. Because these processes are run in a separate goroutine, a context and waitgroup are provided to synchronize with the rest of sg-core.
 
-# Handlers
+---
+**NOTE**
+Implementations of the Run() function ___must___ begin by deferring the waitgroup Done() method, otherwise the sg-core will indefinitely hang when attempting exit.
 
-Handlers convert incoming message to internal bus format. They then either write
-to the events or metrics bus. Handlers take no configuration and only serve one
-purpose.
+```go
+func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w WriteFn, done chan bool) transport.Transport {
+    defer wg.Done()
+
+    [...]
+
+}
+
+```
+---
+
+A plugin's Run() function should also listen for close signals on the context and exit when it is received. Additionally, if a critical error occurs, the plugin should pass `true` to the last function argument. This will signal the sg-core to perform a clean exit.
+
+```go
+func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w WriteFn, done chan bool) transport.Transport {
+    defer wg.Done()
+
+    go func() {
+        // receive messages from transport protocol
+
+        if err != nil {  // some error or exit condition 
+            done <- true // signal to sg-core that an unrecoverable event occured and that a clean exit should happen
+            return
+        }
+    }
+
+    <-ctx.Done() //wait for exit signal
+    //cleanup resources
+}
+```
+
+
+## Configurations
+Plugins should not read their own cofiguration files. The sg-core reads the plugin configuration from the `config` bock and passes it into the plugin's `Config()` method. Most plugin's configuration validation should be done with the ParseConfig() function in the `pkg/config` package. This validates config objects using the [validator](https://pkg.go.dev/gopkg.in/go-playground/validator.v9) library and provides descriptive error messages for failed configurations. The developer can choose to wrap this method or implement their own if they wish to provide even more comprehensive feedback.
+
+An example of a plugin configuration for a transport plugin might look like the following:
+
+```go
+package main
+
+
+[...]
+
+type configT struct {
+    Address string `yaml:"address" validate:"required"` //required parameter
+    Instance string `yaml:"instance" validate:"oneof=inst0 inst1 inst2 inst3"` //must be element in set
+    Port int `yaml:"port"`
+}
+
+type Socket struct {
+    conf configT
+    logger *logging.Logger
+}
+
+func (s *Socket) Config(c []byte) error {
+    s.conf = configT{}
+    err := config.ParseConfig(bytes.NewReader(c), &s.conf)
+    if err != nil {
+        return err // sg-core will log configuration error message and exit
+    }
+    return nil
+}
+
+[...]
+
+func New(l *logging.Logger) transport.Transport {
+    return &Socket{
+        logger: l,
+        conf: configT{
+            Port: 9090 // set defaults. Only overriden if input data for Config() contains the port option
+        }
+    }
+}
+
+```
+
+## Transports
+
+Transport plugins listen on an external messaging protocal and deliver received messages to handlers that have been bound to it per the administrator's configuration. They receive a configuration block from the main configuration file. Transports should contain the minimal amount of code necessary to fulfill this functionality. 
+
+Transport plugin objects must implement the the Transport interface:
+```go
+type Transport interface {
+	Config([]byte) error
+	Run(context.Context, *sync.WaitGroup, WriteFn, chan bool)
+	Listen(data.Event)
+}
+```
+
+## Handlers
+
+Handlers parse incoming blobs from the transport into objects and delivers those objects to the internal buses. There are two types of handlers: metric handlers and event handlers. Metric handlers deliver metric objects to the internal metrics bus while event handlers deliver event objects to the internal events bus. These metrics and events are then consumed by the application plugins.
+
+Handlers must remain simple: they take in no configuration and should only handle one message type. See the [collectd-metrics](https://github.com/pleimer/sg-core-refactor/tree/master/plugins/handler/collectd-metrics) plugin for an example. Additionally, handlers should not print logs (this is why no logger is passed into the New() function). If errors occur while parsing messages, handlers should create their own metrics or events recording the error(s) and write them to the bus. The `collectd-metrics` handler iterates a counter every time a parsing error occurs and submits the number as a metric to the metric bus.
+
+
+Handler plugin objects must imeplement either the MetricHandler interface or the EventHandler interface:
+```go
+type MetricHandler interface {
+	Handle([]byte) []data.Metric
+}
+
+type EventHandler interface {
+	Handle([]byte) (data.Event, error)
+}
+```
+
+## Applications
+
+The purpose of application plugins are to provide the business logic for interfacing external programs like a database. They receive both metrics and events and must decide what to do with them. For example, the [prometheus](https://github.com/pleimer/sg-core-refactor/tree/master/plugins/application/prometheus) plugin receives metrics from the internal metrics bus and stores them into Prometheus.
+
+Application plugins must implement the Application interface:
+```go
+type Application interface {
+	Config([]byte) error
+	Run(context.Context, *sync.WaitGroup, chan data.Event, chan []data.Metric, chan bool)
+}
+```
+
+## Examples
