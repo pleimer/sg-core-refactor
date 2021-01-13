@@ -9,7 +9,7 @@ Plugins should be objects with a constructor such that more than one can be
 created if there exists more than one configuration for that plugin.
 
 # Development
-Sg-core begins by loading plugin shared object files (those that have been configures) and calling the New() function. The New() function is different for each type:
+Sg-core begins by loading plugin shared object files (those that have been configured) and calling the New() function. The New() function is different for each type:
 
 Plugin Type | Initializer Function
 -|-
@@ -17,7 +17,7 @@ Transport | `func New(* logging.Logger) transport.Transport`
 Handler | `func New() handler.MetricHandler` or `func New() handler.EventHandler`
 Application | `func New(* logging.Logger) application.Application`
 
-Both transport and application plugins contain a Run() function which contain their primary process. Because these processes are run in a separate goroutine, a context and waitgroup are provided to synchronize with the rest of sg-core.
+Both transport and application plugins contain a Run() function which encompass their primary process. Because these processes are run in a separate goroutine, a context and waitgroup are provided to synchronize with the rest of sg-core.
 
 ---
 **NOTE**
@@ -34,7 +34,7 @@ func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn, 
 ```
 ---
 
-A plugin's Run() function should also listen for close signals on the context and exit when it is received. Additionally, if a critical error occurs, the plugin should pass `true` to the last function argument. This will signal the sg-core to perform a clean exit.
+A plugin's Run() function should also listen for close signals on the context and exit when it is received. Additionally, if a critical error occurs, the plugin should pass `true` to the boolean channel. This will signal the sg-core to perform a clean exit.
 
 ```go
 func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn, done chan bool) transport.Transport {
@@ -56,9 +56,9 @@ func (t *TCP) Run(ctx context.Context, wg *sync.WaitGroup, w transport.WriteFn, 
 
 
 ## Configurations
-Plugins should not read their own cofiguration files. The sg-core reads the plugin configuration from the `config` bock and passes it into the plugin's `Config()` method. Most plugin's configuration validation should be done with the ParseConfig() function in the `pkg/config` package. This validates config objects using the [validator](https://pkg.go.dev/gopkg.in/go-playground/validator.v9) library and provides descriptive error messages for failed configurations. The developer can choose to wrap this method or implement their own if they wish to provide even more comprehensive feedback.
+Plugins should not read their own cofiguration files. The sg-core reads the plugin configuration from the `config` block and passes it into the plugin's `Config()` method as a byte slice. Most plugin's configuration validation should be done with the ParseConfig() function in the `pkg/config` package. ParseConfig() validates objects using the [validator](https://pkg.go.dev/gopkg.in/go-playground/validator.v9) library and provides descriptive error messages for failed configurations. Typically, the plugin specifies a configuration object with yaml and validator tags and passes an instance of it into the ParseConfig() method for unmarshalling and validation.
 
-An example of a plugin configuration for a transport plugin might look like the following:
+Here is the pattern typically followed by most application and transport plugins for receiving and validating a configuration:
 
 ```go
 package main
@@ -101,7 +101,9 @@ func New(l *logging.Logger) transport.Transport {
 
 ## Transports
 
-Transport plugins listen on an external messaging protocal and deliver received messages to handlers that have been bound to it per the administrator's configuration. They receive a configuration block from the main configuration file. Transports should contain the minimal amount of code necessary to fulfill this functionality. 
+Transport plugins listen on an external messaging protocal and deliver received messages to handlers that have been bound to it per the administrator's configuration. They receive a configuration block from the main configuration file and write to handlers by involing transport.WriteFn in Run().
+
+Transports should contain the minimal amount of code necessary to fulfill this functionality. 
 
 Transport plugin objects must implement the the Transport interface:
 ```go
@@ -132,7 +134,7 @@ type EventHandler interface {
 
 ## Applications
 
-The purpose of application plugins are to provide the business logic for interfacing external programs like a database. They receive both metrics and events and must decide what to do with them. For example, the [prometheus](https://github.com/pleimer/sg-core-refactor/tree/master/plugins/application/prometheus) plugin receives metrics from the internal metrics bus and stores them into Prometheus.
+The purpose of application plugins are to provide the business logic for interfacing with external programs like a database. They receive both metrics and events and must decide what to do with them. For example, the [prometheus](https://github.com/pleimer/sg-core-refactor/tree/master/plugins/application/prometheus) plugin receives metrics from the internal metrics bus and stores them into Prometheus.
 
 Application plugins must implement the Application interface:
 ```go

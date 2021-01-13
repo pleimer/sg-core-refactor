@@ -10,7 +10,7 @@ var sampleMetrics []data.Metric = []data.Metric{
 	{
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",
@@ -19,7 +19,7 @@ var sampleMetrics []data.Metric = []data.Metric{
 	}, {
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",
@@ -38,7 +38,7 @@ var sampleMetrics []data.Metric = []data.Metric{
 	{
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",
@@ -47,7 +47,7 @@ var sampleMetrics []data.Metric = []data.Metric{
 	}, {
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",
@@ -66,7 +66,7 @@ var sampleMetrics []data.Metric = []data.Metric{
 	{
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",
@@ -75,7 +75,7 @@ var sampleMetrics []data.Metric = []data.Metric{
 	}, {
 		Name:  "collectd_metric_type0_samples_total",
 		Value: 2121.0,
-		Type:  data.DERIVE,
+		Type:  data.COUNTER,
 		Labels: map[string]string{
 			"host":            "localhost",
 			"plugin_instance": "base",
